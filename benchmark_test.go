@@ -23,7 +23,7 @@ func BenchmarkInference_Disabled(b *testing.B) {
 	}
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, op := instr.StartInference(ctx, req)
 		op.End(otelgenai.Response{Model: "gpt-4o"}, nil)
 	}
@@ -41,7 +41,7 @@ func BenchmarkInference_Recording(b *testing.B) {
 	}
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, op := instr.StartInference(ctx, req)
 		op.End(otelgenai.Response{Model: "gpt-4o"}, nil)
 	}
@@ -63,7 +63,7 @@ func BenchmarkChunkObserve(b *testing.B) {
 	chunk := otelgenai.Chunk{IsOutput: true}
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		state.ObserveChunk(chunk)
 	}
 }
