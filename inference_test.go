@@ -37,7 +37,7 @@ func TestInference_Success(t *testing.T) {
 		Provider:  "openai",
 		Model:     "gpt-4o",
 	}
-	ctx, op := instr.StartInference(ctx, req)
+	_, op := instr.StartInference(ctx, req)
 	if op == nil {
 		t.Fatal("StartInference returned nil op")
 	}
@@ -72,7 +72,7 @@ func TestInference_Error(t *testing.T) {
 		Provider:  "openai",
 		Model:     "gpt-4o",
 	}
-	ctx, op := instr.StartInference(ctx, req)
+	_, op := instr.StartInference(ctx, req)
 	op.End(otelgenai.Response{}, errors.New("some secret error message with PII"))
 
 	spans := exporter.GetSpans().Snapshots()

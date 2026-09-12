@@ -43,7 +43,7 @@ func AssertAttr(t *testing.T, span sdktrace.ReadOnlySpan, key string, expected a
 	t.Helper()
 	for _, attr := range span.Attributes() {
 		if string(attr.Key) == key {
-			if attr.Value.Type() == expected.Type() && attr.Value.Emit() == expected.Emit() {
+			if attr.Value.Type() == expected.Type() && attr.Value.String() == expected.String() {
 				return
 			}
 			t.Errorf("span attr %q: got %v, want %v", key, attr.Value, expected)
@@ -70,7 +70,7 @@ func AssertAttrNotPresent(t *testing.T, span sdktrace.ReadOnlySpan, key string) 
 func AssertNoSentinel(t *testing.T, span sdktrace.ReadOnlySpan, sentinels []string) {
 	t.Helper()
 	for _, attr := range span.Attributes() {
-		s := attr.Value.Emit()
+		s := attr.Value.String()
 		for _, sentinel := range sentinels {
 			if s == sentinel {
 				t.Errorf("span attr %q contains sentinel %q", attr.Key, sentinel)

@@ -10,6 +10,8 @@ import (
 // maps to a specific opt-in span attribute.
 type ContentKind string
 
+// ContentKind values identify the kind of content being projected. Each
+// value maps to a specific opt-in span attribute.
 const (
 	ContentKindSystemInstructions ContentKind = "system_instructions"
 	ContentKindInputMessages      ContentKind = "input_messages"

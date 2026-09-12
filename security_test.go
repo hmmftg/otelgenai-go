@@ -22,26 +22,6 @@ var sentinelSecrets = []string{
 	"tool-argument-secret",
 }
 
-// newTestInstrumenterWithProjector creates an Instrumenter with a
-// projector that redacts secrets by replacing them with "[REDACTED]".
-func newTestInstrumenterWithProjector(t *testing.T) (*otelgenai.Instrumenter, *tracetest.InMemoryExporter) {
-	t.Helper()
-	exporter := tracetest.NewInMemoryExporter()
-	tp := newTestTracerProvider(exporter)
-	projector := func(v otelgenai.ContentValue) (otelgenai.ContentValue, error) {
-		// Simple redaction: replace sentinel secrets in string fields.
-		return v, nil
-	}
-	instr, err := otelgenai.New(
-		otelgenai.WithTracerProvider(tp),
-		otelgenai.WithContentProjector(projector),
-	)
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	return instr, exporter
-}
-
 func TestSecurity_NoContentByDefault(t *testing.T) {
 	instr, exporter := newTestInstrumenter(t)
 
@@ -95,7 +75,7 @@ func TestSecurity_NoRawErrorInTelemetry(t *testing.T) {
 func TestSecurity_ProjectorPanicDroppedNoFallback(t *testing.T) {
 	exporter := tracetest.NewInMemoryExporter()
 	tp := newTestTracerProvider(exporter)
-	panicProjector := func(v otelgenai.ContentValue) (otelgenai.ContentValue, error) {
+	panicProjector := func(_ otelgenai.ContentValue) (otelgenai.ContentValue, error) {
 		panic("projector panic")
 	}
 	instr, err := otelgenai.New(

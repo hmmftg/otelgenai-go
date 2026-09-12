@@ -120,7 +120,7 @@ func (t *ToolOperation) End(err error) {
 // execution with instrumentation. It starts a tool span, invokes the
 // function, and ends the span with the result. It does not force a
 // framework-specific tool interface.
-func TraceTool[T any](in *Instrumenter, ctx context.Context, req ToolRequest, fn func(ctx context.Context) (T, error)) (T, error) {
+func TraceTool[T any](ctx context.Context, in *Instrumenter, req ToolRequest, fn func(ctx context.Context) (T, error)) (T, error) {
 	ctx, op := in.StartTool(ctx, req)
 	result, err := fn(ctx)
 	op.End(err)

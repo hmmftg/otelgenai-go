@@ -23,7 +23,3 @@ func strVal(s string) attribute.Value {
 func int64Val(i int64) attribute.Value {
 	return attribute.Int64Value(i)
 }
-
-func float64Val(f float64) attribute.Value {
-	return attribute.Float64Value(f)
-}

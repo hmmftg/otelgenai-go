@@ -130,19 +130,19 @@ const (
 	DescExecuteToolDuration               = "Duration of GenAI tool executions."
 )
 
-// Recommended explicit histogram boundaries for duration metrics (seconds).
+// DurationBoundaries are recommended explicit histogram boundaries for duration metrics (seconds).
 var DurationBoundaries = []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300}
 
-// Recommended explicit histogram boundaries for time-to-first-chunk (seconds).
+// TimeToFirstChunkBoundaries are recommended explicit histogram boundaries for time-to-first-chunk (seconds).
 var TimeToFirstChunkBoundaries = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 
-// Recommended explicit histogram boundaries for time-per-output-chunk (seconds).
+// TimePerOutputChunkBoundaries are recommended explicit histogram boundaries for time-per-output-chunk (seconds).
 var TimePerOutputChunkBoundaries = []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1}
 
-// Recommended explicit histogram boundaries for token usage counts.
+// TokenUsageBoundaries are recommended explicit histogram boundaries for token usage counts.
 var TokenUsageBoundaries = []float64{1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144, 1048576}
 
-// Recommended explicit histogram boundaries for inference/tool call counts.
+// CountBoundaries are recommended explicit histogram boundaries for inference/tool call counts.
 var CountBoundaries = []float64{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024}
 
 // ConventionVersion identifies the pinned semantic-convention snapshot.

@@ -58,7 +58,7 @@ func ExampleStreaming() {
 			oai.UserMessage("Tell me a joke"),
 		},
 	})
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	for stream.Next() {
 		chunk := stream.Current()

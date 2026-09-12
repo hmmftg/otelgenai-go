@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/hmmftg/otelgenai-go/internal/safety"
 )
@@ -43,7 +44,7 @@ func New(opts ...Option) (*Instrumenter, error) {
 
 	if cfg.disabled {
 		return &Instrumenter{
-			tracer:     trace.NewNoopTracerProvider().Tracer(cfg.instrumentationName),
+			tracer:     noop.NewTracerProvider().Tracer(cfg.instrumentationName),
 			metrics:    noopMetrics(),
 			cfg:        cfg,
 			classifier: cfg.errorClassifier,

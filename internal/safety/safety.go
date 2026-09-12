@@ -10,6 +10,8 @@ import "fmt"
 // contain rejected content, raw errors, or other sensitive data.
 type Reason string
 
+// Reason values are low-cardinality diagnostic reason codes for each
+// failure stage of content projection and callback execution.
 const (
 	ReasonProjectorPanic    Reason = "projector.panic"
 	ReasonProjectorError    Reason = "projector.error"
@@ -65,7 +67,7 @@ func GuardedDiagnostic(handler DiagnosticHandler, d Diagnostic) {
 		return
 	}
 	defer func() {
-		recover()
+		_ = recover()
 	}()
 	handler(d)
 }

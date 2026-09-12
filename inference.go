@@ -75,7 +75,6 @@ type InferenceOperation struct {
 	finalized      bool
 	firstChunkTime time.Time
 	hasFirstChunk  bool
-	prevChunkTime  time.Time
 }
 
 // StartInference creates a CLIENT span named "{operation} {model}" and

@@ -14,7 +14,7 @@ func TestAgent_Success(t *testing.T) {
 	instr, exporter := newTestInstrumenter(t)
 
 	ctx := context.Background()
-	ctx, op := instr.StartAgent(ctx, otelgenai.AgentRequest{
+	_, op := instr.StartAgent(ctx, otelgenai.AgentRequest{
 		Name:        "my-agent",
 		Description: "test agent",
 		Model:       "gpt-4o",
@@ -140,7 +140,7 @@ func TestTraceTool_Generic(t *testing.T) {
 	instr, exporter := newTestInstrumenter(t)
 
 	ctx := context.Background()
-	result, err := otelgenai.TraceTool(instr, ctx, otelgenai.ToolRequest{Name: "compute"}, func(ctx context.Context) (int, error) {
+	result, err := otelgenai.TraceTool(ctx, instr, otelgenai.ToolRequest{Name: "compute"}, func(_ context.Context) (int, error) {
 		return 42, nil
 	})
 	if err != nil || result != 42 {
