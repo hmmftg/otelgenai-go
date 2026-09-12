@@ -3,5 +3,6 @@
 /benchmarks.txt
 *.test
 *.prof
+*.exe
 /bin/
 /dist/
