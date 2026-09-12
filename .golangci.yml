@@ -1,0 +1,47 @@
+version: "2"
+
+run:
+  go: "1.27"
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - gosec
+    - misspell
+    - revive
+
+linters-settings:
+  govet:
+    enable-all: false
+  staticcheck:
+    checks: ["all"]
+  gosec:
+    excludes:
+      - G104  # unhandled errors are checked by errcheck
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-naming
+      - name: error-strings
+      - name: exported
+      - name: increment-decrement
+      - name: indent-error-flow
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: var-declaration
+      - name: var-naming
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck

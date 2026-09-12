@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - name: Go mod tidy check
+        run: |
+          go mod tidy
+          cd instrumentation/openai && go mod tidy
+          cd ../anthropic && go mod tidy
+          cd ../.. && git diff --exit-code
+      - name: Go vet
+        run: go vet ./...
+      - name: Go build
+        run: go build ./...
+      - name: Go test
+        run: go test ./...
+
+  test-race:
+    name: Race test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - name: Race test (root)
+        run: go test -race -coverprofile=coverage-root.out ./...
+      - name: Race test (openai)
+        run: cd instrumentation/openai && go test -race ./...
+      - name: Race test (anthropic)
+        run: cd instrumentation/anthropic && go test -race ./...
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage-*.out
+
+  downstream:
+    name: Downstream consumers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - name: Root-only consumer
+        run: cd test/downstream/root-only && GOWORK=off go build ./...
+      - name: OpenAI-only consumer
+        run: cd test/downstream/openai-only && GOWORK=off go build ./...
+      - name: Anthropic-only consumer
+        run: cd test/downstream/anthropic-only && GOWORK=off go build ./...
+
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - name: Run benchmarks
+        run: go test -bench=. -benchmem ./... | tee benchmarks.txt
+      - name: Upload benchmarks
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks
+          path: benchmarks.txt

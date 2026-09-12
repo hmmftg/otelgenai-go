@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Module to release (root, openai, anthropic)"
+        required: true
+        type: choice
+        options:
+          - root
+          - openai
+          - anthropic
+      version:
+        description: "Version tag (e.g. v0.1.0)"
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Release ${{ inputs.module }} ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+
+      - name: Validate all modules
+        run: |
+          go mod tidy
+          go vet ./...
+          go test ./...
+          go build ./...
+          cd instrumentation/openai && go mod tidy && go vet ./... && go test ./... && go build ./...
+          cd ../anthropic && go mod tidy && go vet ./... && go test ./... && go build ./...
+
+      - name: Validate downstream consumers
+        run: |
+          cd test/downstream/root-only && GOWORK=off go build ./...
+          cd ../openai-only && GOWORK=off go build ./...
+          cd ../anthropic-only && GOWORK=off go build ./...
+
+      - name: Determine tag
+        id: tag
+        run: |
+          case "${{ inputs.module }}" in
+            root)
+              echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
+              ;;
+            openai)
+              echo "tag=instrumentation/openai/${{ inputs.version }}" >> $GITHUB_OUTPUT
+              ;;
+            anthropic)
+              echo "tag=instrumentation/anthropic/${{ inputs.version }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Create tag
+        run: |
+          git tag ${{ steps.tag.outputs.tag }}
+          git push origin ${{ steps.tag.outputs.tag }}
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          prerelease: ${{ startsWith(inputs.version, 'v0.') }}

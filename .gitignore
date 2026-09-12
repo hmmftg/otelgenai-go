@@ -1,0 +1,7 @@
+/coverage.out
+/coverage.txt
+/benchmarks.txt
+*.test
+*.prof
+/bin/
+/dist/
