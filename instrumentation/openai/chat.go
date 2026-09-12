@@ -14,7 +14,7 @@ import (
 // GenAI instrumentation. It creates one logical span per operation that
 // encloses all automatic SDK retries.
 type ChatCompletions struct {
-	client      *oai.Client
+	client       *oai.Client
 	instrumenter *otelgenai.Instrumenter
 }
 
@@ -118,5 +118,5 @@ func (s *ChatCompletionStream) finalize(terminal bool, err error) {
 			terminal = true
 		}
 	}
-	s.state.FinalizeStream(terminal, err)
+	s.state.FinalizeStream(terminal, resp, err)
 }

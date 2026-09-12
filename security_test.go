@@ -47,11 +47,11 @@ func TestSecurity_NoContentByDefault(t *testing.T) {
 
 	ctx := context.Background()
 	req := otelgenai.Request{
-		Operation:         otelgenai.Operation(semconv.OperationChat),
-		Provider:          "openai",
-		Model:             "gpt-4o",
+		Operation:          otelgenai.Operation(semconv.OperationChat),
+		Provider:           "openai",
+		Model:              "gpt-4o",
 		SystemInstructions: "SECRET_API_KEY_12345",
-		InputMessages:     []otelgenai.Message{{Role: "user", Content: "my-very-private-prompt-content"}},
+		InputMessages:      []otelgenai.Message{{Role: "user", Content: "my-very-private-prompt-content"}},
 	}
 	_, op := instr.StartInference(ctx, req)
 	op.End(otelgenai.Response{
@@ -108,9 +108,9 @@ func TestSecurity_ProjectorPanicDroppedNoFallback(t *testing.T) {
 
 	ctx := context.Background()
 	_, op := instr.StartInference(ctx, otelgenai.Request{
-		Operation:         otelgenai.Operation(semconv.OperationChat),
-		Provider:          "openai",
-		Model:             "gpt-4o",
+		Operation:          otelgenai.Operation(semconv.OperationChat),
+		Provider:           "openai",
+		Model:              "gpt-4o",
 		SystemInstructions: "my-very-private-prompt-content",
 	})
 	op.End(otelgenai.Response{Model: "gpt-4o"}, nil)
@@ -131,7 +131,7 @@ func TestSecurity_ProjectorOversizeDropped(t *testing.T) {
 	bigProjector := func(v otelgenai.ContentValue) (otelgenai.ContentValue, error) {
 		// Return a value that exceeds the projection limit.
 		return otelgenai.ContentValue{
-			Kind:              v.Kind,
+			Kind:               v.Kind,
 			SystemInstructions: string(make([]byte, 10000)),
 		}, nil
 	}
@@ -146,9 +146,9 @@ func TestSecurity_ProjectorOversizeDropped(t *testing.T) {
 
 	ctx := context.Background()
 	_, op := instr.StartInference(ctx, otelgenai.Request{
-		Operation:         otelgenai.Operation(semconv.OperationChat),
-		Provider:          "openai",
-		Model:             "gpt-4o",
+		Operation:          otelgenai.Operation(semconv.OperationChat),
+		Provider:           "openai",
+		Model:              "gpt-4o",
 		SystemInstructions: "test",
 	})
 	op.End(otelgenai.Response{Model: "gpt-4o"}, nil)

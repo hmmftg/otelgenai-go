@@ -49,10 +49,13 @@ func (s *Responses) NewStreaming(ctx context.Context, params responses.ResponseN
 // ResponseStream wraps the official SSE stream for Responses, observing
 // typed events for telemetry while yielding each SDK event unchanged.
 type ResponseStream struct {
-	inner *ssestream.Stream[responses.ResponseStreamEventUnion]
-	state *otelgenai.StreamState
-	op    *otelgenai.InferenceOperation
-	in    *otelgenai.Instrumenter
+	inner     *ssestream.Stream[responses.ResponseStreamEventUnion]
+	state     *otelgenai.StreamState
+	op        *otelgenai.InferenceOperation
+	in        *otelgenai.Instrumenter
+	accumResp otelgenai.Response
+	hasResp   bool
+	terminal  bool
 }
 
 func newResponseStream(inner *ssestream.Stream[responses.ResponseStreamEventUnion], op *otelgenai.InferenceOperation, in *otelgenai.Instrumenter) *ResponseStream {
@@ -69,12 +72,21 @@ func newResponseStream(inner *ssestream.Stream[responses.ResponseStreamEventUnio
 func (s *ResponseStream) Next() bool {
 	hasNext := s.inner.Next()
 	if !hasNext {
-		s.finalize(false, s.inner.Err())
+		s.finalize(s.terminal, s.inner.Err())
 		return false
 	}
-	// Observe output chunks for Responses API: text delta events contain
-	// model output. The specific event type is checked via the union.
-	s.state.ObserveChunk(otelgenai.Chunk{IsOutput: true})
+	event := s.inner.Current()
+	// Observe output chunks only for text delta events.
+	if event.Type == "response.output_text.delta" {
+		s.state.ObserveChunk(otelgenai.Chunk{IsOutput: true})
+	}
+	// Accumulate usage and metadata from the completed event.
+	if event.Type == "response.completed" {
+		completed := event.AsResponseCompleted()
+		s.accumResp = mapResponseResponse(&completed.Response)
+		s.hasResp = true
+		s.terminal = true
+	}
 	return true
 }
 
@@ -91,12 +103,16 @@ func (s *ResponseStream) Err() error {
 // Close closes the stream and finalizes telemetry. It is idempotent.
 func (s *ResponseStream) Close() error {
 	err := s.inner.Close()
-	s.finalize(false, err)
+	s.finalize(s.terminal, err)
 	return err
 }
 
 // finalize finalizes the stream telemetry. It is idempotent and safe
 // to call from multiple terminal paths.
 func (s *ResponseStream) finalize(terminal bool, err error) {
-	s.state.FinalizeStream(terminal, err)
+	var resp otelgenai.Response
+	if s.hasResp {
+		resp = s.accumResp
+	}
+	s.state.FinalizeStream(terminal, resp, err)
 }

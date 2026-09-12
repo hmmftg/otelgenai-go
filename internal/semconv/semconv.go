@@ -15,30 +15,30 @@ package semconv
 // Attribute keys for GenAI spans and metrics.
 const (
 	// System attributes.
-	AttrGenAISystem           = "gen_ai.system"
-	AttrGenAIRequestModel     = "gen_ai.request.model"
-	AttrGenAIResponseModel    = "gen_ai.response.model"
-	AttrGenAIResponseID       = "gen_ai.response.id"
-	AttrGenAIOperationName    = "gen_ai.operation.name"
-	AttrGenAIRequestMaxTokens = "gen_ai.request.max_tokens"
-	AttrGenAIRequestTemperature = "gen_ai.request.temperature"
-	AttrGenAIRequestTopP      = "gen_ai.request.top_p"
-	AttrGenAIRequestSeed      = "gen_ai.request.seed"
+	AttrGenAISystem               = "gen_ai.system"
+	AttrGenAIRequestModel         = "gen_ai.request.model"
+	AttrGenAIResponseModel        = "gen_ai.response.model"
+	AttrGenAIResponseID           = "gen_ai.response.id"
+	AttrGenAIOperationName        = "gen_ai.operation.name"
+	AttrGenAIRequestMaxTokens     = "gen_ai.request.max_tokens"
+	AttrGenAIRequestTemperature   = "gen_ai.request.temperature"
+	AttrGenAIRequestTopP          = "gen_ai.request.top_p"
+	AttrGenAIRequestSeed          = "gen_ai.request.seed"
 	AttrGenAIRequestStopSequences = "gen_ai.request.stop_sequences"
-	AttrGenAIRequestStreaming = "gen_ai.request.streaming"
-	AttrGenAIServerAddress   = "server.address"
-	AttrGenAIServerPort      = "server.port"
+	AttrGenAIRequestStreaming     = "gen_ai.request.streaming"
+	AttrGenAIServerAddress        = "server.address"
+	AttrGenAIServerPort           = "server.port"
 
 	// Usage attributes.
-	AttrGenAIUsageInputTokens  = "gen_ai.usage.input_tokens"
-	AttrGenAIUsageOutputTokens = "gen_ai.usage.output_tokens"
-	AttrGenAITokenType         = "gen_ai.token.type"
+	AttrGenAIUsageInputTokens           = "gen_ai.usage.input_tokens"
+	AttrGenAIUsageOutputTokens          = "gen_ai.usage.output_tokens"
+	AttrGenAITokenType                  = "gen_ai.token.type"
 	AttrGenAIUsageCacheReadInputTokens  = "gen_ai.usage.cache_read_input_tokens"
 	AttrGenAIUsageCacheWriteInputTokens = "gen_ai.usage.cache_write_input_tokens"
 	AttrGenAIUsageReasoningTokens       = "gen_ai.usage.reasoning_tokens"
 
 	// Response attributes.
-	AttrGenAIResponseFinishReasons = "gen_ai.response.finish_reasons"
+	AttrGenAIResponseFinishReasons    = "gen_ai.response.finish_reasons"
 	AttrGenAIResponseTimeToFirstChunk = "gen_ai.response.time_to_first_chunk"
 
 	// Error attributes.
@@ -50,8 +50,8 @@ const (
 	AttrGenAIAgentID          = "gen_ai.agent.id"
 
 	// Tool attributes.
-	AttrGenAIToolName = "gen_ai.tool.name"
-	AttrGenAIToolType = "gen_ai.tool.type"
+	AttrGenAIToolName   = "gen_ai.tool.name"
+	AttrGenAIToolType   = "gen_ai.tool.type"
 	AttrGenAIToolCallID = "gen_ai.tool.call.id"
 
 	// Opt-in content attributes (never set by default).
@@ -100,14 +100,14 @@ const (
 
 // Metric instrument names.
 const (
-	MetricClientOperationDuration       = "gen_ai.client.operation.duration"
-	MetricClientTokenUsage              = "gen_ai.client.token.usage"
-	MetricClientOperationTimeToFirstChunk = "gen_ai.client.operation.time_to_first_chunk"
+	MetricClientOperationDuration           = "gen_ai.client.operation.duration"
+	MetricClientTokenUsage                  = "gen_ai.client.token.usage"
+	MetricClientOperationTimeToFirstChunk   = "gen_ai.client.operation.time_to_first_chunk"
 	MetricClientOperationTimePerOutputChunk = "gen_ai.client.operation.time_per_output_chunk"
-	MetricInvokeAgentDuration           = "gen_ai.invoke_agent.duration"
-	MetricInvokeAgentInferenceCalls     = "gen_ai.invoke_agent.inference_calls"
-	MetricInvokeAgentToolCalls          = "gen_ai.invoke_agent.tool_calls"
-	MetricExecuteToolDuration           = "gen_ai.execute_tool.duration"
+	MetricInvokeAgentDuration               = "gen_ai.invoke_agent.duration"
+	MetricInvokeAgentInferenceCalls         = "gen_ai.invoke_agent.inference_calls"
+	MetricInvokeAgentToolCalls              = "gen_ai.invoke_agent.tool_calls"
+	MetricExecuteToolDuration               = "gen_ai.execute_tool.duration"
 )
 
 // Metric units.
@@ -120,14 +120,14 @@ const (
 
 // Metric descriptions.
 const (
-	DescClientOperationDuration       = "Duration of GenAI client operations."
-	DescClientTokenUsage              = "Number of tokens used by GenAI client operations."
-	DescClientOperationTimeToFirstChunk = "Time to first output chunk for streaming GenAI operations."
+	DescClientOperationDuration           = "Duration of GenAI client operations."
+	DescClientTokenUsage                  = "Number of tokens used by GenAI client operations."
+	DescClientOperationTimeToFirstChunk   = "Time to first output chunk for streaming GenAI operations."
 	DescClientOperationTimePerOutputChunk = "Time between output chunks for streaming GenAI operations."
-	DescInvokeAgentDuration           = "Duration of GenAI agent invocations."
-	DescInvokeAgentInferenceCalls     = "Number of inference calls made by a GenAI agent invocation."
-	DescInvokeAgentToolCalls          = "Number of tool calls made by a GenAI agent invocation."
-	DescExecuteToolDuration           = "Duration of GenAI tool executions."
+	DescInvokeAgentDuration               = "Duration of GenAI agent invocations."
+	DescInvokeAgentInferenceCalls         = "Number of inference calls made by a GenAI agent invocation."
+	DescInvokeAgentToolCalls              = "Number of tool calls made by a GenAI agent invocation."
+	DescExecuteToolDuration               = "Duration of GenAI tool executions."
 )
 
 // Recommended explicit histogram boundaries for duration metrics (seconds).

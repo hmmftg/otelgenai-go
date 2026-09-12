@@ -11,12 +11,12 @@ import "fmt"
 type Reason string
 
 const (
-	ReasonProjectorPanic     Reason = "projector.panic"
-	ReasonProjectorError     Reason = "projector.error"
-	ReasonProjectorOversize  Reason = "projector.oversize"
-	ReasonProjectorInvalid   Reason = "projector.invalid_shape"
-	ReasonProjectorBadJSON   Reason = "projector.invalid_json"
-	ReasonClassifierPanic    Reason = "classifier.panic"
+	ReasonProjectorPanic    Reason = "projector.panic"
+	ReasonProjectorError    Reason = "projector.error"
+	ReasonProjectorOversize Reason = "projector.oversize"
+	ReasonProjectorInvalid  Reason = "projector.invalid_shape"
+	ReasonProjectorBadJSON  Reason = "projector.invalid_json"
+	ReasonClassifierPanic   Reason = "classifier.panic"
 	ReasonDiagnosticPanic   Reason = "diagnostic.panic"
 )
 

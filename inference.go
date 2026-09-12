@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
@@ -66,6 +65,7 @@ type Usage struct {
 type InferenceOperation struct {
 	span           trace.Span
 	in             *Instrumenter
+	ctx            context.Context
 	startTime      time.Time
 	operation      Operation
 	model          string
@@ -154,6 +154,7 @@ func (in *Instrumenter) StartInference(ctx context.Context, req Request) (contex
 	op := &InferenceOperation{
 		span:      span,
 		in:        in,
+		ctx:       ctx,
 		startTime: time.Now(),
 		operation: req.Operation,
 		model:     req.Model,
@@ -239,7 +240,7 @@ func (op *InferenceOperation) End(resp Response, err error) {
 
 	// Emit duration metric.
 	duration := time.Since(op.startTime).Seconds()
-	op.in.metrics.clientOperationDuration.Record(context.Background(), duration,
+	op.in.metrics.clientOperationDuration.Record(op.ctx, duration,
 		metric.WithAttributes(
 			attribute.String(semconv.AttrGenAIOperationName, string(op.operation)),
 			attribute.String(semconv.AttrGenAISystem, op.provider),
@@ -249,7 +250,7 @@ func (op *InferenceOperation) End(resp Response, err error) {
 
 	// Emit token usage metrics.
 	if resp.Usage.InputTokens > 0 {
-		op.in.metrics.clientTokenUsage.Record(context.Background(), resp.Usage.InputTokens,
+		op.in.metrics.clientTokenUsage.Record(op.ctx, resp.Usage.InputTokens,
 			metric.WithAttributes(
 				attribute.String(semconv.AttrGenAIOperationName, string(op.operation)),
 				attribute.String(semconv.AttrGenAISystem, op.provider),
@@ -259,7 +260,7 @@ func (op *InferenceOperation) End(resp Response, err error) {
 		)
 	}
 	if resp.Usage.OutputTokens > 0 {
-		op.in.metrics.clientTokenUsage.Record(context.Background(), resp.Usage.OutputTokens,
+		op.in.metrics.clientTokenUsage.Record(op.ctx, resp.Usage.OutputTokens,
 			metric.WithAttributes(
 				attribute.String(semconv.AttrGenAIOperationName, string(op.operation)),
 				attribute.String(semconv.AttrGenAISystem, op.provider),
@@ -288,6 +289,3 @@ func (in *Instrumenter) nopInference() *InferenceOperation {
 func fmtSpanName(operation, model string) string {
 	return fmt.Sprintf("%s %s", operation, model)
 }
-
-// Ensure otel import is used for potential global access.
-var _ = otel.GetTracerProvider

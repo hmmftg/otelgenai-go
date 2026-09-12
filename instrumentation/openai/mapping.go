@@ -23,6 +23,9 @@ import (
 // mapChatCompletionResponse converts an OpenAI ChatCompletion to the
 // provider-neutral otelgenai.Response.
 func mapChatCompletionResponse(r *oai.ChatCompletion) otelgenai.Response {
+	if r == nil {
+		return otelgenai.Response{}
+	}
 	resp := otelgenai.Response{
 		Model: r.Model,
 		ID:    r.ID,
@@ -78,6 +81,9 @@ func mapChatRequest(params oai.ChatCompletionNewParams, streaming bool) otelgena
 // mapEmbeddingResponse converts an OpenAI CreateEmbeddingResponse to
 // the provider-neutral otelgenai.Response.
 func mapEmbeddingResponse(r *oai.CreateEmbeddingResponse) otelgenai.Response {
+	if r == nil {
+		return otelgenai.Response{}
+	}
 	return otelgenai.Response{
 		Model: r.Model,
 		Usage: otelgenai.Usage{
@@ -99,6 +105,9 @@ func mapEmbeddingRequest(params oai.EmbeddingNewParams) otelgenai.Request {
 // mapResponseResponse converts an OpenAI Responses API Response to the
 // provider-neutral otelgenai.Response.
 func mapResponseResponse(r *responses.Response) otelgenai.Response {
+	if r == nil {
+		return otelgenai.Response{}
+	}
 	resp := otelgenai.Response{
 		Model: string(r.Model),
 		ID:    r.ID,

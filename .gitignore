@@ -1,7 +1,9 @@
 /coverage.out
 /coverage.txt
+/coverage/
 /benchmarks.txt
 *.test
+*.exe
 *.prof
 *.exe
 /bin/

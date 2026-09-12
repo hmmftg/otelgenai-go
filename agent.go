@@ -26,6 +26,7 @@ type AgentRequest struct {
 type AgentOperation struct {
 	span           trace.Span
 	in             *Instrumenter
+	ctx            context.Context
 	startTime      time.Time
 	name           string
 	inferenceCalls int64
@@ -92,6 +93,7 @@ func (in *Instrumenter) StartAgent(ctx context.Context, req AgentRequest) (conte
 	op := &AgentOperation{
 		span:      span,
 		in:        in,
+		ctx:       ctx,
 		startTime: time.Now(),
 		name:      req.Name,
 	}
@@ -149,13 +151,13 @@ func (a *AgentOperation) End(err error) {
 		attrs = nil
 	}
 
-	a.in.metrics.invokeAgentDuration.Record(context.Background(), duration,
+	a.in.metrics.invokeAgentDuration.Record(a.ctx, duration,
 		metric.WithAttributes(attrs...),
 	)
-	a.in.metrics.invokeAgentInferenceCalls.Record(context.Background(), atomic.LoadInt64(&a.inferenceCalls),
+	a.in.metrics.invokeAgentInferenceCalls.Record(a.ctx, atomic.LoadInt64(&a.inferenceCalls),
 		metric.WithAttributes(attrs...),
 	)
-	a.in.metrics.invokeAgentToolCalls.Record(context.Background(), atomic.LoadInt64(&a.toolCalls),
+	a.in.metrics.invokeAgentToolCalls.Record(a.ctx, atomic.LoadInt64(&a.toolCalls),
 		metric.WithAttributes(attrs...),
 	)
 }

@@ -10,6 +10,9 @@ import (
 // mapMessageResponse converts an Anthropic Message to the
 // provider-neutral otelgenai.Response.
 func mapMessageResponse(r *anth.Message) otelgenai.Response {
+	if r == nil {
+		return otelgenai.Response{}
+	}
 	resp := otelgenai.Response{
 		Model: string(r.Model),
 		ID:    r.ID,
@@ -28,6 +31,18 @@ func mapMessageResponse(r *anth.Message) otelgenai.Response {
 // input tokens. We report them as separate convention attributes
 // without adding them to the aggregate input count.
 func mapUsage(u anth.Usage) otelgenai.Usage {
+	return otelgenai.Usage{
+		InputTokens:      u.InputTokens,
+		OutputTokens:     u.OutputTokens,
+		CacheReadTokens:  u.CacheReadInputTokens,
+		CacheWriteTokens: u.CacheCreationInputTokens,
+	}
+}
+
+// mapDeltaUsage converts an Anthropic MessageDeltaUsage (cumulative
+// usage reported in message_delta stream events) to the provider-neutral
+// otelgenai.Usage.
+func mapDeltaUsage(u anth.MessageDeltaUsage) otelgenai.Usage {
 	return otelgenai.Usage{
 		InputTokens:      u.InputTokens,
 		OutputTokens:     u.OutputTokens,

@@ -11,10 +11,13 @@ import (
 // observing typed events for telemetry while yielding each SDK event
 // unchanged.
 type MessageStream struct {
-	inner *ssestream.Stream[anth.MessageStreamEventUnion]
-	state *otelgenai.StreamState
-	op    *otelgenai.InferenceOperation
-	in    *otelgenai.Instrumenter
+	inner     *ssestream.Stream[anth.MessageStreamEventUnion]
+	state     *otelgenai.StreamState
+	op        *otelgenai.InferenceOperation
+	in        *otelgenai.Instrumenter
+	accumResp otelgenai.Response
+	hasResp   bool
+	terminal  bool
 }
 
 func newMessageStream(inner *ssestream.Stream[anth.MessageStreamEventUnion], op *otelgenai.InferenceOperation, in *otelgenai.Instrumenter) *MessageStream {
@@ -31,12 +34,31 @@ func newMessageStream(inner *ssestream.Stream[anth.MessageStreamEventUnion], op 
 func (s *MessageStream) Next() bool {
 	hasNext := s.inner.Next()
 	if !hasNext {
-		s.finalize(false, s.inner.Err())
+		s.finalize(s.terminal, s.inner.Err())
 		return false
 	}
-	// Observe output chunks: only content_block_delta events contain
-	// actual model output. The SDK event union is checked here.
-	s.state.ObserveChunk(otelgenai.Chunk{IsOutput: true})
+	event := s.inner.Current()
+	// Observe output chunks only for content_block_delta events.
+	if event.Type == "content_block_delta" {
+		s.state.ObserveChunk(otelgenai.Chunk{IsOutput: true})
+	}
+	// Accumulate model and ID from message_start.
+	if event.Type == "message_start" {
+		start := event.AsMessageStart()
+		s.accumResp.Model = string(start.Message.Model)
+		s.accumResp.ID = start.Message.ID
+		s.hasResp = true
+	}
+	// Accumulate cumulative usage and stop reason from message_delta.
+	if event.Type == "message_delta" {
+		delta := event.AsMessageDelta()
+		s.accumResp.Usage = mapDeltaUsage(delta.Usage)
+		if string(delta.Delta.StopReason) != "" {
+			s.accumResp.FinishReasons = []string{string(delta.Delta.StopReason)}
+		}
+		s.hasResp = true
+		s.terminal = true
+	}
 	return true
 }
 
@@ -53,12 +75,16 @@ func (s *MessageStream) Err() error {
 // Close closes the stream and finalizes telemetry. It is idempotent.
 func (s *MessageStream) Close() error {
 	err := s.inner.Close()
-	s.finalize(false, err)
+	s.finalize(s.terminal, err)
 	return err
 }
 
 // finalize finalizes the stream telemetry. It is idempotent and safe
 // to call from multiple terminal paths.
 func (s *MessageStream) finalize(terminal bool, err error) {
-	s.state.FinalizeStream(terminal, err)
+	var resp otelgenai.Response
+	if s.hasResp {
+		resp = s.accumResp
+	}
+	s.state.FinalizeStream(terminal, resp, err)
 }

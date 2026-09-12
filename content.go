@@ -12,11 +12,11 @@ type ContentKind string
 
 const (
 	ContentKindSystemInstructions ContentKind = "system_instructions"
-	ContentKindInputMessages       ContentKind = "input_messages"
-	ContentKindOutputMessages      ContentKind = "output_messages"
-	ContentKindToolDefinitions     ContentKind = "tool_definitions"
-	ContentKindToolCallArguments   ContentKind = "tool_call_arguments"
-	ContentKindToolCallResult      ContentKind = "tool_call_result"
+	ContentKindInputMessages      ContentKind = "input_messages"
+	ContentKindOutputMessages     ContentKind = "output_messages"
+	ContentKindToolDefinitions    ContentKind = "tool_definitions"
+	ContentKindToolCallArguments  ContentKind = "tool_call_arguments"
+	ContentKindToolCallResult     ContentKind = "tool_call_result"
 )
 
 // ContentValue is the canonical, provider-neutral representation of
@@ -24,7 +24,7 @@ const (
 // Provider adapters normalize their SDK types into these models only
 // when the relevant content kind is enabled.
 type ContentValue struct {
-	Kind     ContentKind
+	Kind ContentKind
 	// SystemInstructions is set when Kind is ContentKindSystemInstructions.
 	SystemInstructions string
 	// Messages is set when Kind is ContentKindInputMessages or
@@ -87,6 +87,14 @@ func projectContent(
 	}
 	projected.Kind = kind
 
+	if !validateProjectionShape(projected) {
+		safety.GuardedDiagnostic(diag, safety.Diagnostic{
+			Stage:  string(kind),
+			Reason: safety.ReasonProjectorInvalid,
+		})
+		return ""
+	}
+
 	data, err := serializeProjection(projected)
 	if err != nil {
 		safety.GuardedDiagnostic(diag, safety.Diagnostic{
@@ -100,14 +108,6 @@ func projectContent(
 		safety.GuardedDiagnostic(diag, safety.Diagnostic{
 			Stage:  string(kind),
 			Reason: safety.ReasonProjectorOversize,
-		})
-		return ""
-	}
-
-	if !validateProjectionShape(projected) {
-		safety.GuardedDiagnostic(diag, safety.Diagnostic{
-			Stage:  string(kind),
-			Reason: safety.ReasonProjectorInvalid,
 		})
 		return ""
 	}

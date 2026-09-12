@@ -44,7 +44,7 @@ func TestInference_Success(t *testing.T) {
 	op.End(otelgenai.Response{
 		Model:         "gpt-4o",
 		ID:            "chatcmpl-123",
-		FinishReasons:  []string{"stop"},
+		FinishReasons: []string{"stop"},
 		Usage:         otelgenai.Usage{InputTokens: 10, OutputTokens: 20},
 	}, nil)
 

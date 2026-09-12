@@ -25,6 +25,7 @@ type ToolRequest struct {
 type ToolOperation struct {
 	span      trace.Span
 	in        *Instrumenter
+	ctx       context.Context
 	startTime time.Time
 	name      string
 	mu        sync.Mutex
@@ -71,6 +72,7 @@ func (in *Instrumenter) StartTool(ctx context.Context, req ToolRequest) (context
 	return ctx, &ToolOperation{
 		span:      span,
 		in:        in,
+		ctx:       ctx,
 		startTime: time.Now(),
 		name:      req.Name,
 	}
@@ -105,10 +107,11 @@ func (t *ToolOperation) End(err error) {
 	duration := time.Since(t.startTime).Seconds()
 	t.span.End()
 
-	attrs := []attribute.KeyValue{
-		attribute.String(semconv.AttrGenAIToolName, t.name),
+	var attrs []attribute.KeyValue
+	if t.name != "" {
+		attrs = append(attrs, attribute.String(semconv.AttrGenAIToolName, t.name))
 	}
-	t.in.metrics.executeToolDuration.Record(context.Background(), duration,
+	t.in.metrics.executeToolDuration.Record(t.ctx, duration,
 		metric.WithAttributes(attrs...),
 	)
 }

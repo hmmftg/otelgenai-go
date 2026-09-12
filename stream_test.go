@@ -28,7 +28,7 @@ func TestStreaming_FirstChunkTiming(t *testing.T) {
 	state.ObserveChunk(otelgenai.Chunk{IsOutput: true})
 
 	// Finalize with terminal success.
-	state.FinalizeStream(true, nil)
+	state.FinalizeStream(true, otelgenai.Response{}, nil)
 
 	spans := exporter.GetSpans().Snapshots()
 	if len(spans) != 1 {
@@ -61,7 +61,7 @@ func TestStreaming_EarlyClose(t *testing.T) {
 	state := otelgenai.NewStreamState(op)
 
 	// Close before terminal event.
-	state.FinalizeStream(false, nil)
+	state.FinalizeStream(false, otelgenai.Response{}, nil)
 
 	spans := exporter.GetSpans().Snapshots()
 	if len(spans) != 1 {
@@ -93,9 +93,9 @@ func TestStreaming_IdempotentFinalize(t *testing.T) {
 	state := otelgenai.NewStreamState(op)
 
 	// Finalize multiple times.
-	state.FinalizeStream(true, nil)
-	state.FinalizeStream(true, nil)
-	state.FinalizeStream(false, errors.New("late error"))
+	state.FinalizeStream(true, otelgenai.Response{}, nil)
+	state.FinalizeStream(true, otelgenai.Response{}, nil)
+	state.FinalizeStream(false, otelgenai.Response{}, errors.New("late error"))
 
 	spans := exporter.GetSpans().Snapshots()
 	if len(spans) != 1 {
@@ -120,7 +120,7 @@ func TestStreaming_ConcurrentFinalize(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			state.FinalizeStream(true, nil)
+			state.FinalizeStream(true, otelgenai.Response{}, nil)
 		}()
 	}
 	wg.Wait()
@@ -147,7 +147,7 @@ func TestStreaming_NonOutputChunksNotTimed(t *testing.T) {
 	state.ObserveChunk(otelgenai.Chunk{IsOutput: false})
 	state.ObserveChunk(otelgenai.Chunk{IsOutput: false})
 
-	state.FinalizeStream(true, nil)
+	state.FinalizeStream(true, otelgenai.Response{}, nil)
 
 	spans := exporter.GetSpans().Snapshots()
 	if len(spans) != 1 {

@@ -23,17 +23,18 @@ type Chunk struct {
 // StreamState tracks streaming timing and finalization state for an
 // InferenceOperation. It is embedded in provider stream wrappers.
 type StreamState struct {
-	mu            sync.Mutex
-	finalized     bool
-	op            *InferenceOperation
-	in            *Instrumenter
-	operation     Operation
-	provider      string
-	model         string
-	startTime     time.Time
+	mu             sync.Mutex
+	finalized      bool
+	op             *InferenceOperation
+	in             *Instrumenter
+	ctx            context.Context
+	operation      Operation
+	provider       string
+	model          string
+	startTime      time.Time
 	firstChunkTime time.Time
-	hasFirstChunk bool
-	prevChunkTime time.Time
+	hasFirstChunk  bool
+	prevChunkTime  time.Time
 }
 
 // NewStreamState creates a StreamState for the given inference operation.
@@ -44,10 +45,11 @@ func NewStreamState(op *InferenceOperation) *StreamState {
 	return &StreamState{
 		op:        op,
 		in:        op.in,
-		operation:  op.operation,
+		ctx:       op.ctx,
+		operation: op.operation,
 		provider:  op.provider,
 		model:     op.model,
-		startTime:  op.startTime,
+		startTime: op.startTime,
 	}
 }
 
@@ -72,7 +74,7 @@ func (s *StreamState) ObserveChunk(c Chunk) {
 		// Record time between output chunks.
 		interval := now.Sub(s.prevChunkTime).Seconds()
 		s.in.metrics.clientOperationTimePerOutputChunk.Record(
-			context.Background(), interval,
+			s.ctx, interval,
 			metric.WithAttributes(
 				attribute.String(semconv.AttrGenAIOperationName, string(s.operation)),
 				attribute.String(semconv.AttrGenAISystem, s.provider),
@@ -87,8 +89,10 @@ func (s *StreamState) ObserveChunk(c Chunk) {
 // safe to call from multiple terminal paths (End, stream error,
 // cancellation, Close). The terminal parameter indicates whether the
 // stream reached a terminal provider event (true) or was closed early
-// (false). The err parameter is the terminal error if any.
-func (s *StreamState) FinalizeStream(terminal bool, err error) {
+// (false). The resp parameter carries accumulated response metadata
+// (usage, model, ID, finish reasons) extracted from stream events. The
+// err parameter is the terminal error if any.
+func (s *StreamState) FinalizeStream(terminal bool, resp Response, err error) {
 	if s == nil {
 		return
 	}
@@ -104,7 +108,7 @@ func (s *StreamState) FinalizeStream(terminal bool, err error) {
 	if s.hasFirstChunk {
 		ttfb := s.firstChunkTime.Sub(s.startTime).Seconds()
 		s.in.metrics.clientOperationTimeToFirstChunk.Record(
-			context.Background(), ttfb,
+			s.ctx, ttfb,
 			metric.WithAttributes(
 				attribute.String(semconv.AttrGenAIOperationName, string(s.operation)),
 				attribute.String(semconv.AttrGenAISystem, s.provider),
@@ -113,8 +117,6 @@ func (s *StreamState) FinalizeStream(terminal bool, err error) {
 		)
 	}
 
-	// Classify the outcome.
-	var resp Response
 	finalErr := err
 	if !terminal && err == nil {
 		// Stream closed before terminal event with no error: treat as
