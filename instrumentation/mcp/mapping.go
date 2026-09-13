@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/hmmftg/otelgenai-go"
-	"go.opentelemetry.io/otel/attribute"
 	mcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // MCP attribute constants (adapter-local, not in core semconv).
@@ -20,7 +20,7 @@ const (
 
 // MCP method name constants.
 const (
-	MethodToolsCall    = "tools/call"
+	MethodToolsCall     = "tools/call"
 	MethodResourcesRead = "resources/read"
 	MethodPromptsGet    = "prompts/get"
 )

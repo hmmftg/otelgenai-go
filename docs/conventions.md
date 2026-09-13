@@ -70,6 +70,24 @@ the convention contract.
 | Tool type | `gen_ai.tool.type` |
 | Tool call ID | `gen_ai.tool.call.id` |
 
+### MCP attributes (adapter-local)
+
+These attributes are emitted by the MCP adapter (`instrumentation/mcp`)
+and are intentionally kept adapter-local because upstream MCP semantic
+conventions are still evolving.
+
+| Attribute | Key | Methods |
+|-----------|-----|---------|
+| MCP method name | `mcp.method.name` | `tools/call`, `resources/read`, `prompts/get` |
+| Resource URI | `mcp.resource.uri` | `resources/read` |
+| Prompt name | `gen_ai.prompt.name` | `prompts/get` |
+
+### Internal operation attributes
+
+`InternalOperation` spans are generic INTERNAL spans with no
+provider-specific or MCP-specific knowledge. They carry only the
+supplied attributes plus `error.type` on failure.
+
 ### Opt-in content attributes (disabled by default)
 
 These attributes are only emitted when a `ContentProjector` is configured.
@@ -106,11 +124,35 @@ By default, no content is captured.
 | Invoke agent | `invoke_agent` |
 | Execute tool | `execute_tool` |
 
+### MCP operations (repository semantic mapping)
+
+v0.3 provides repository-level INTERNAL operation mapping for MCP.
+It does not claim canonical MCP `CLIENT`/`SERVER` RPC span
+instrumentation because upstream MCP semantic conventions are still
+evolving (see
+[open-telemetry/semantic-conventions-genai#437](https://github.com/open-telemetry/semantic-conventions-genai/issues/437)).
+
+| MCP method | Core operation | Span name | Span kind | Agent counter |
+|---|---|---|---|---|
+| `tools/call` | `StartTool` | `execute_tool {name}` | INTERNAL | client +1, server +0 |
+| `resources/read` | `StartInternalOperation` | `resources/read` | INTERNAL | 0 |
+| `prompts/get` | `StartInternalOperation` | `prompts/get` | INTERNAL | 0 |
+
+This is a repository semantic mapping, not canonical MCP RPC span
+mapping. Canonical MCP `CLIENT`/`SERVER` RPC spans, session lifecycle
+modeling, and duplicate-span suppression are deferred to a later
+version.
+
 ## Span naming
 
 Spans are named `{operation} {model}` for inference operations and
 `{operation} {name}` for agent and tool operations. Span naming is delegated
 to the core `StartInference`, `StartAgent`, and `StartTool` functions.
+
+For MCP `resources/read` and `prompts/get`, the span name is the MCP
+method name only (no URI or prompt name in the span name). Resource
+URIs and prompt names are carried as attributes (`mcp.resource.uri`
+and `gen_ai.prompt.name` respectively).
 
 ## Metrics
 

@@ -287,7 +287,7 @@ func TestFullNestedScenario(t *testing.T) {
 	inferReq := otelgenai.Request{
 		Operation: otelgenai.Operation("generate_content"),
 		Model:     "gemini-2.5-flash",
-		Provider: "gcp.gemini",
+		Provider:  "gcp.gemini",
 	}
 	_, inferOp := instr.StartInference(ctx, inferReq)
 	inferOp.End(otelgenai.Response{}, nil)

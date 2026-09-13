@@ -6,7 +6,8 @@ Framework-neutral OpenTelemetry GenAI instrumentation for Go.
 metrics for generative AI operations. It wraps the official OpenAI,
 Anthropic, and Google GenAI Go SDKs with typed service adapters that
 create one logical span per provider operation, enclosing all automatic
-SDK retries.
+SDK retries. It also instruments MCP (Model Context Protocol) client
+and server operations.
 
 ## Why?
 
@@ -22,7 +23,7 @@ core and isolated provider adapters.
 - Not an exporter or collector configuration library.
 - Not a cost/pricing engine.
 - Not a retry, routing, caching, or rate-limiting library.
-- Not a RAG, memory, workflow, or MCP instrumentation library (yet).
+- Not a RAG, memory, or workflow library.
 
 ## Architecture
 
@@ -31,7 +32,8 @@ otelgenai-go/
 ├── go.mod                         # Core module (framework-neutral)
 ├── instrumentation/openai/        # OpenAI adapter module
 ├── instrumentation/anthropic/     # Anthropic adapter module
-└── instrumentation/google-genai/  # Google GenAI adapter module
+├── instrumentation/google-genai/  # Google GenAI adapter module
+└── instrumentation/mcp/           # MCP adapter module
 ```
 
 The core module depends only on OpenTelemetry API packages. Each
@@ -133,6 +135,32 @@ For Vertex AI, set `Backend: genai.BackendVertexAI` with `Project` and
 `Location`. The adapter automatically attributes telemetry to
 `gen_ai.system=gcp.vertex_ai` (or `gcp.gemini` for the Gemini API
 backend).
+
+### MCP adapter
+
+The MCP adapter instruments `tools/call`, `resources/read`, and
+`prompts/get` as repository-level INTERNAL GenAI operations. It uses
+the official `github.com/modelcontextprotocol/go-sdk` and propagates
+W3C trace context via MCP `_meta`.
+
+```go
+instr, _ := otelgenai.New()
+
+// Client-side instrumentation.
+client := mcp.NewClient(&mcp.Implementation{Name: "my-client", Version: "1.0"}, nil)
+client.AddSendingMiddleware(mcpadapter.ClientMiddleware(instr))
+
+// Server-side instrumentation.
+server := mcp.NewServer(&mcp.Implementation{Name: "my-server", Version: "1.0"}, nil)
+server.AddReceivingMiddleware(mcpadapter.ServerMiddleware(instr))
+```
+
+v0.3 provides repository-level INTERNAL operation mapping. It does not
+claim canonical MCP `CLIENT`/`SERVER` RPC span instrumentation; upstream
+MCP semantic conventions are still evolving. When both client and
+server middleware are enabled in the same process, duplicate spans are
+expected and intentional (connected via `_meta` trace-context
+propagation).
 
 ### Generic trace helpers
 

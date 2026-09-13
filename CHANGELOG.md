@@ -10,6 +10,35 @@ development.
 
 ## [Unreleased]
 
+### Added (v0.3)
+
+- MCP adapter module (`instrumentation/mcp`) providing instrumentation for
+  the Model Context Protocol using the official
+  `github.com/modelcontextprotocol/go-sdk` (v1.7.0).
+  - Client-side `AddSendingMiddleware` and server-side
+    `AddReceivingMiddleware` instrumentation.
+  - Instruments `tools/call`, `resources/read`, and `prompts/get` methods
+    as repository-level INTERNAL GenAI operations.
+  - W3C trace-context propagation via MCP `_meta` (traceparent, tracestate,
+    baggage) using the application's configured global propagator.
+  - Server-side agent counter isolation: server middleware extracts only
+    remote trace context, preventing local agent counter increments.
+  - Metadata ownership: `_meta` is cloned before injection; caller-owned
+    maps are never mutated.
+  - Non-instrumented methods pass through completely unchanged.
+- Core: `InternalOperation` type with `StartInternalOperation` for
+  generic INTERNAL spans with configured error classification, nil-safe
+    and idempotent `End`.
+- Core: `ToolRequest.Attrs` field for adapter-supplied attributes (used by
+  MCP for `mcp.method.name`).
+- StreamState hardening tests: nil-safe, post-finalization, disabled
+  instrumenter.
+- Error classification consistency tests across Inference, Tool, and
+  InternalOperation.
+- Context propagation tests across Agent, Inference, Tool, and
+  InternalOperation hierarchies.
+- Downstream consumer test for MCP-only dependency isolation.
+
 ### Added (v0.2)
 
 - Generic `TraceInference` and `TraceAgent` helpers for provider-neutral

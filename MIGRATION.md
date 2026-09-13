@@ -2,6 +2,54 @@
 
 This document describes how to migrate between versions of otelgenai-go.
 
+## Migrating to v0.3
+
+v0.3 adds MCP instrumentation and core hardening while preserving
+backward compatibility with v0.2.
+
+### New features
+
+- **MCP adapter**: new `instrumentation/mcp` module for Model Context
+  Protocol instrumentation using `modelcontextprotocol/go-sdk` v1.7.0.
+  - Client middleware: `ClientMiddleware(instr)` for `AddSendingMiddleware`.
+  - Server middleware: `ServerMiddleware(instr)` for `AddReceivingMiddleware`.
+  - Instruments `tools/call`, `resources/read`, `prompts/get` as
+    INTERNAL GenAI operations.
+  - W3C trace-context propagation via MCP `_meta`.
+- **InternalOperation**: `StartInternalOperation` for generic INTERNAL
+  spans with configured error classification.
+- **ToolRequest.Attrs**: backward-compatible field for adapter-supplied
+  attributes.
+
+### Using the MCP adapter
+
+```go
+import (
+    mcp "github.com/modelcontextprotocol/go-sdk/mcp"
+    mcpadapter "github.com/hmmftg/otelgenai-go/instrumentation/mcp"
+)
+
+// Client-side.
+client := mcp.NewClient(&mcp.Implementation{Name: "my-app", Version: "1.0"}, nil)
+client.AddSendingMiddleware(mcpadapter.ClientMiddleware(instr))
+
+// Server-side.
+server := mcp.NewServer(&mcp.Implementation{Name: "my-server", Version: "1.0"}, nil)
+server.AddReceivingMiddleware(mcpadapter.ServerMiddleware(instr))
+```
+
+### Semantic scope
+
+v0.3 provides repository-level INTERNAL operation mapping for MCP. It
+does not claim canonical MCP `CLIENT`/`SERVER` RPC span
+instrumentation. Canonical MCP RPC span semantics are deferred until
+upstream conventions stabilize (protocol 2026-07-28).
+
+### Backward compatibility
+
+All v0.2 APIs remain unchanged. The new `InternalOperation` type and
+`ToolRequest.Attrs` field are additive.
+
 ## Migrating to v0.2
 
 v0.2 adds new providers and public APIs while preserving backward
