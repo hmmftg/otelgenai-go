@@ -8,8 +8,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/conformancetest"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
+	"github.com/hmmftg/otelgenai-go/testutil"
 )
 
 // sentinelSecrets are secret values that must never appear in
@@ -45,11 +45,11 @@ func TestSecurity_NoContentByDefault(t *testing.T) {
 	}
 	span := spans[0]
 	// No content attributes should be present by default.
-	conformancetest.AssertAttrNotPresent(t, span, semconv.AttrGenAISystemInstructions)
-	conformancetest.AssertAttrNotPresent(t, span, semconv.AttrGenAIInputMessages)
-	conformancetest.AssertAttrNotPresent(t, span, semconv.AttrGenAIOutputMessages)
+	testutil.AssertAttrNotPresent(t, span, semconv.AttrGenAISystemInstructions)
+	testutil.AssertAttrNotPresent(t, span, semconv.AttrGenAIInputMessages)
+	testutil.AssertAttrNotPresent(t, span, semconv.AttrGenAIOutputMessages)
 	// No sentinels should appear anywhere.
-	conformancetest.AssertNoSentinel(t, span, sentinelSecrets)
+	testutil.AssertNoSentinel(t, span, sentinelSecrets)
 }
 
 func TestSecurity_NoRawErrorInTelemetry(t *testing.T) {
@@ -69,7 +69,7 @@ func TestSecurity_NoRawErrorInTelemetry(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertNoSentinel(t, span, sentinelSecrets)
+	testutil.AssertNoSentinel(t, span, sentinelSecrets)
 }
 
 func TestSecurity_ProjectorPanicDroppedNoFallback(t *testing.T) {
@@ -101,8 +101,8 @@ func TestSecurity_ProjectorPanicDroppedNoFallback(t *testing.T) {
 	}
 	span := spans[0]
 	// The projection should have been dropped; no content should appear.
-	conformancetest.AssertAttrNotPresent(t, span, semconv.AttrGenAISystemInstructions)
-	conformancetest.AssertNoSentinel(t, span, sentinelSecrets)
+	testutil.AssertAttrNotPresent(t, span, semconv.AttrGenAISystemInstructions)
+	testutil.AssertNoSentinel(t, span, sentinelSecrets)
 }
 
 func TestSecurity_ProjectorOversizeDropped(t *testing.T) {
@@ -138,5 +138,5 @@ func TestSecurity_ProjectorOversizeDropped(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertAttrNotPresent(t, span, semconv.AttrGenAISystemInstructions)
+	testutil.AssertAttrNotPresent(t, span, semconv.AttrGenAISystemInstructions)
 }

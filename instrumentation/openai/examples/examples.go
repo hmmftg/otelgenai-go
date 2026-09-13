@@ -67,3 +67,34 @@ func ExampleStreaming() {
 		}
 	}
 }
+
+// ExampleOpenAICompatible demonstrates instrumenting an
+// OpenAI-compatible provider (e.g. Ollama, vLLM, Groq) using the
+// official OpenAI SDK with a custom base URL and the WithSystem option.
+func ExampleOpenAICompatible() {
+	instr, _ := otelgenai.New()
+
+	// Create the official OpenAI client pointing at the compatible
+	// endpoint.
+	client := oai.NewClient(
+		option.WithBaseURL("http://localhost:11434/v1"),
+		option.WithAPIKey("dummy"),
+	)
+
+	// Wrap with instrumentation, overriding gen_ai.system so the
+	// telemetry identifies the provider correctly.
+	chat := openai.NewChatCompletions(&client, instr, openai.WithSystem("ollama"))
+
+	ctx := context.Background()
+	resp, err := chat.New(ctx, oai.ChatCompletionNewParams{
+		Model: "llama3.2",
+		Messages: []oai.ChatCompletionMessageParamUnion{
+			oai.UserMessage("Hello!"),
+		},
+	})
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		return
+	}
+	fmt.Printf("response model: %s\n", resp.Model)
+}

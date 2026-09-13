@@ -3,9 +3,10 @@
 Framework-neutral OpenTelemetry GenAI instrumentation for Go.
 
 `otelgenai-go` emits specification-pinned OpenTelemetry traces and
-metrics for generative AI operations. It wraps the official OpenAI and
-Anthropic Go SDKs with typed service adapters that create one logical
-span per provider operation, enclosing all automatic SDK retries.
+metrics for generative AI operations. It wraps the official OpenAI,
+Anthropic, and Google GenAI Go SDKs with typed service adapters that
+create one logical span per provider operation, enclosing all automatic
+SDK retries.
 
 ## Why?
 
@@ -27,9 +28,10 @@ core and isolated provider adapters.
 
 ```
 otelgenai-go/
-├── go.mod                      # Core module (framework-neutral)
-├── instrumentation/openai/     # OpenAI adapter module
-└── instrumentation/anthropic/  # Anthropic adapter module
+├── go.mod                         # Core module (framework-neutral)
+├── instrumentation/openai/        # OpenAI adapter module
+├── instrumentation/anthropic/     # Anthropic adapter module
+└── instrumentation/google-genai/  # Google GenAI adapter module
 ```
 
 The core module depends only on OpenTelemetry API packages. Each
@@ -85,6 +87,19 @@ resp, err := chat.New(ctx, openai.ChatCompletionNewParams{
 })
 ```
 
+### OpenAI-compatible providers
+
+For Ollama, vLLM, Groq, and other OpenAI-compatible providers, use the
+official OpenAI SDK with a custom base URL and `WithSystem`:
+
+```go
+client := openai.NewClient(
+    option.WithBaseURL("http://localhost:11434/v1"),
+    option.WithAPIKey("dummy"),
+)
+chat := openaiadapter.NewChatCompletions(&client, instr, openaiadapter.WithSystem("ollama"))
+```
+
 ### Anthropic adapter
 
 ```go
@@ -96,6 +111,39 @@ resp, err := msgs.New(ctx, anthropic.MessageNewParams{
     Model:     anthropic.ModelClaude3Haiku,
     MaxTokens: 1024,
     Messages:  []anthropic.MessageParamUnion{anthropic.NewUserMessage(anthropic.NewTextBlock("Hello!"))},
+})
+```
+
+### Google GenAI adapter
+
+```go
+instr, _ := otelgenai.New()
+client, _ := genai.NewClient(ctx, &genai.ClientConfig{
+    APIKey:  "your-api-key",
+    Backend: genai.BackendGeminiAPI,
+})
+models := googlegenai.NewModels(client, instr)
+
+resp, err := models.GenerateContent(ctx, "gemini-2.5-flash", []*genai.Content{
+    {Role: "user", Parts: []*genai.Part{{Text: "Hello!"}}},
+}, nil)
+```
+
+For Vertex AI, set `Backend: genai.BackendVertexAI` with `Project` and
+`Location`. The adapter automatically attributes telemetry to
+`gen_ai.system=gcp.vertex_ai` (or `gcp.gemini` for the Gemini API
+backend).
+
+### Generic trace helpers
+
+```go
+resp, err := otelgenai.TraceInference(ctx, instr, otelgenai.Request{
+    Operation: otelgenai.Operation("chat"),
+    Provider:  "openai",
+    Model:     "gpt-4o",
+}, func(ctx context.Context) (otelgenai.Response, error) {
+    // Your inference call here.
+    return otelgenai.Response{Model: "gpt-4o"}, nil
 })
 ```
 
@@ -136,8 +184,10 @@ reviewed changes.
 | Module                          | Go     | OTel    | Provider SDK           |
 |---------------------------------|--------|---------|-----------------------|
 | `otelgenai-go` (core)           | 1.27   | v1.46.0 | —                     |
+| `otelgenai-go/testutil`         | 1.27   | v1.46.0 | —                     |
 | `instrumentation/openai`        | 1.27   | v1.46.0 | openai-go v1.12.0     |
 | `instrumentation/anthropic`     | 1.27   | v1.46.0 | anthropic-sdk-go v1.72.0 |
+| `instrumentation/google-genai`  | 1.27   | v1.46.0 | google.golang.org/genai v1.71.0 |
 
 ## Stream-close responsibility
 

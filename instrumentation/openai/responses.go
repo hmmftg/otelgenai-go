@@ -17,19 +17,26 @@ import (
 type Responses struct {
 	client       *oai.Client
 	instrumenter *otelgenai.Instrumenter
+	system       string
 }
 
 // NewResponses creates a typed service wrapper around the official
-// OpenAI Responses service.
-func NewResponses(client *oai.Client, instr *otelgenai.Instrumenter) *Responses {
-	return &Responses{client: client, instrumenter: instr}
+// OpenAI Responses service. Optional adapter options (e.g. WithSystem)
+// may be passed to override the default gen_ai.system value for
+// OpenAI-compatible providers.
+func NewResponses(client *oai.Client, instr *otelgenai.Instrumenter, opts ...Option) *Responses {
+	return &Responses{
+		client:       client,
+		instrumenter: instr,
+		system:       resolveSystem(opts),
+	}
 }
 
 // New wraps ResponseService.New with instrumentation. It forwards all
 // request options unchanged and returns the official response type
 // unchanged.
 func (s *Responses) New(ctx context.Context, params responses.ResponseNewParams, opts ...option.RequestOption) (*responses.Response, error) {
-	req := mapResponseRequest(params, false)
+	req := mapResponseRequest(params, false, s.system)
 	ctx, op := s.instrumenter.StartInference(ctx, req)
 	resp, err := s.client.Responses.New(ctx, params, opts...)
 	op.End(mapResponseResponse(resp), err)
@@ -40,7 +47,7 @@ func (s *Responses) New(ctx context.Context, params responses.ResponseNewParams,
 // It returns a wrapped stream that observes typed events while yielding
 // each SDK event unchanged.
 func (s *Responses) NewStreaming(ctx context.Context, params responses.ResponseNewParams, opts ...option.RequestOption) *ResponseStream {
-	req := mapResponseRequest(params, true)
+	req := mapResponseRequest(params, true, s.system)
 	ctx, op := s.instrumenter.StartInference(ctx, req)
 	inner := s.client.Responses.NewStreaming(ctx, params, opts...)
 	return newResponseStream(inner, op, s.instrumenter)

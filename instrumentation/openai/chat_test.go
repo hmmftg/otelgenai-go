@@ -170,3 +170,125 @@ func TestChatCompletions_Error(t *testing.T) {
 		}
 	}
 }
+
+func TestChatCompletions_WithSystem(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"id": "chatcmpl-test",
+			"object": "chat.completion",
+			"created": 1700000000,
+			"model": "gpt-4o",
+			"choices": [{"index": 0, "message": {"role": "assistant", "content": "hello"}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+		}`)
+	}))
+	defer srv.Close()
+
+	instr, exporter := newTestInstrumenter(t)
+	client := oai.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	chat := openai.NewChatCompletions(&client, instr, openai.WithSystem("ollama"))
+
+	_, err := chat.New(context.Background(), oai.ChatCompletionNewParams{
+		Model: oai.ChatModelGPT4o,
+	})
+	if err != nil {
+		t.Fatalf("chat.New: %v", err)
+	}
+
+	spans := exporter.GetSpans().Snapshots()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	span := spans[0]
+	foundSystem := false
+	for _, attr := range span.Attributes() {
+		if string(attr.Key) == semconv.AttrGenAISystem {
+			foundSystem = true
+			if attr.Value.AsString() != "ollama" {
+				t.Errorf("gen_ai.system: got %q, want %q", attr.Value.AsString(), "ollama")
+			}
+		}
+	}
+	if !foundSystem {
+		t.Error("expected gen_ai.system attribute to be present")
+	}
+}
+
+func TestChatCompletions_WithSystem_EmptyDefaultsToOpenAI(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"id": "chatcmpl-test",
+			"object": "chat.completion",
+			"created": 1700000000,
+			"model": "gpt-4o",
+			"choices": [{"index": 0, "message": {"role": "assistant", "content": "hello"}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+		}`)
+	}))
+	defer srv.Close()
+
+	instr, exporter := newTestInstrumenter(t)
+	client := oai.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	chat := openai.NewChatCompletions(&client, instr, openai.WithSystem(""))
+
+	_, err := chat.New(context.Background(), oai.ChatCompletionNewParams{
+		Model: oai.ChatModelGPT4o,
+	})
+	if err != nil {
+		t.Fatalf("chat.New: %v", err)
+	}
+
+	spans := exporter.GetSpans().Snapshots()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	span := spans[0]
+	for _, attr := range span.Attributes() {
+		if string(attr.Key) == semconv.AttrGenAISystem {
+			if attr.Value.AsString() != "openai" {
+				t.Errorf("gen_ai.system: got %q, want %q (empty should default to openai)", attr.Value.AsString(), "openai")
+			}
+		}
+	}
+}
+
+func TestChatCompletions_WithSystem_WhitespacePreserved(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"id": "chatcmpl-test",
+			"object": "chat.completion",
+			"created": 1700000000,
+			"model": "gpt-4o",
+			"choices": [{"index": 0, "message": {"role": "assistant", "content": "hello"}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+		}`)
+	}))
+	defer srv.Close()
+
+	instr, exporter := newTestInstrumenter(t)
+	client := oai.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	chat := openai.NewChatCompletions(&client, instr, openai.WithSystem(" ollama "))
+
+	_, err := chat.New(context.Background(), oai.ChatCompletionNewParams{
+		Model: oai.ChatModelGPT4o,
+	})
+	if err != nil {
+		t.Fatalf("chat.New: %v", err)
+	}
+
+	spans := exporter.GetSpans().Snapshots()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	span := spans[0]
+	for _, attr := range span.Attributes() {
+		if string(attr.Key) == semconv.AttrGenAISystem {
+			if attr.Value.AsString() != " ollama " {
+				t.Errorf("gen_ai.system: got %q, want %q (whitespace should be preserved)", attr.Value.AsString(), " ollama ")
+			}
+		}
+	}
+}

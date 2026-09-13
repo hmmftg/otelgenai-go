@@ -10,7 +10,20 @@ development.
 
 ## [Unreleased]
 
-### Added
+### Added (v0.2)
+
+- Generic `TraceInference` and `TraceAgent` helpers for provider-neutral
+  inference and agent instrumentation.
+- Public `testutil` package with recorder and semantic assertions
+  (replaces the internal `conformancetest` package).
+- OpenAI-compatible provider support via `WithSystem` option on OpenAI
+  adapters (Ollama, vLLM, Groq, etc.).
+- Google GenAI adapter module (`instrumentation/google-genai`) covering
+  `GenerateContent` and `GenerateContentStream` with backend-aware
+  attribution (`gcp.gemini`, `gcp.vertex_ai`, `gcp.gen_ai`).
+- Documentation: `docs/conventions.md`, `MIGRATION.md`, `docs/roadmap.md`.
+
+### Added (v0.1)
 
 - Initial public release of the framework-neutral OpenTelemetry GenAI
   instrumentation core.
@@ -27,5 +40,10 @@ development.
   timing.
 - Local `invoke_agent` and client-side `execute_tool` spans and metrics.
 - Semantic-convention conformance and sensitive-data contract tests.
+
+### Changed (v0.2)
+
+- Removed `internal/conformancetest` package; replaced by public
+  `testutil` package.
 
 [Unreleased]: https://github.com/hmmftg/otelgenai-go/releases

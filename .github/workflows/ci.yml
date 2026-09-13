@@ -23,6 +23,7 @@ jobs:
           go mod tidy
           cd instrumentation/openai && go mod tidy
           cd ../anthropic && go mod tidy
+          cd ../google-genai && go mod tidy
           cd ../.. && git diff --exit-code
       - name: Go vet
         run: go vet ./...
@@ -45,6 +46,8 @@ jobs:
         run: cd instrumentation/openai && go test -race ./...
       - name: Race test (anthropic)
         run: cd instrumentation/anthropic && go test -race ./...
+      - name: Race test (google-genai)
+        run: cd instrumentation/google-genai && go test -race ./...
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
@@ -65,6 +68,8 @@ jobs:
         run: cd test/downstream/openai-only && GOWORK=off go build ./...
       - name: Anthropic-only consumer
         run: cd test/downstream/anthropic-only && GOWORK=off go build ./...
+      - name: Google GenAI-only consumer
+        run: cd test/downstream/google-genai-only && GOWORK=off go build ./...
 
   benchmark:
     name: Benchmark

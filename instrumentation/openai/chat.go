@@ -16,19 +16,26 @@ import (
 type ChatCompletions struct {
 	client       *oai.Client
 	instrumenter *otelgenai.Instrumenter
+	system       string
 }
 
 // NewChatCompletions creates a typed service wrapper around the
-// official OpenAI Chat Completions service.
-func NewChatCompletions(client *oai.Client, instr *otelgenai.Instrumenter) *ChatCompletions {
-	return &ChatCompletions{client: client, instrumenter: instr}
+// official OpenAI Chat Completions service. Optional adapter options
+// (e.g. WithSystem) may be passed to override the default gen_ai.system
+// value for OpenAI-compatible providers.
+func NewChatCompletions(client *oai.Client, instr *otelgenai.Instrumenter, opts ...Option) *ChatCompletions {
+	return &ChatCompletions{
+		client:       client,
+		instrumenter: instr,
+		system:       resolveSystem(opts),
+	}
 }
 
 // New wraps ChatCompletionService.New with instrumentation. It forwards
 // all request options unchanged and returns the official response type
 // unchanged.
 func (s *ChatCompletions) New(ctx context.Context, params oai.ChatCompletionNewParams, opts ...option.RequestOption) (*oai.ChatCompletion, error) {
-	req := mapChatRequest(params, false)
+	req := mapChatRequest(params, false, s.system)
 	ctx, op := s.instrumenter.StartInference(ctx, req)
 	resp, err := s.client.Chat.Completions.New(ctx, params, opts...)
 	op.End(mapChatCompletionResponse(resp), err)
@@ -39,7 +46,7 @@ func (s *ChatCompletions) New(ctx context.Context, params oai.ChatCompletionNewP
 // instrumentation. It returns a wrapped stream that observes typed
 // events while yielding each SDK event unchanged.
 func (s *ChatCompletions) NewStreaming(ctx context.Context, params oai.ChatCompletionNewParams, opts ...option.RequestOption) *ChatCompletionStream {
-	req := mapChatRequest(params, true)
+	req := mapChatRequest(params, true, s.system)
 	ctx, op := s.instrumenter.StartInference(ctx, req)
 	inner := s.client.Chat.Completions.NewStreaming(ctx, params, opts...)
 	return newChatCompletionStream(inner, op, s.instrumenter)

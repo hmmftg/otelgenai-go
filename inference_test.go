@@ -9,8 +9,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/conformancetest"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
+	"github.com/hmmftg/otelgenai-go/testutil"
 )
 
 // newTestInstrumenter creates an Instrumenter backed by an in-memory
@@ -53,14 +53,14 @@ func TestInference_Success(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertSpanName(t, span, "chat gpt-4o")
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAISystem, strVal("openai"))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIRequestModel, strVal("gpt-4o"))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIResponseModel, strVal("gpt-4o"))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIResponseID, strVal("chatcmpl-123"))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIUsageInputTokens, int64Val(10))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIUsageOutputTokens, int64Val(20))
-	conformancetest.AssertSpanStatus(t, span, codes.Ok)
+	testutil.AssertSpanName(t, span, "chat gpt-4o")
+	testutil.AssertAttr(t, span, semconv.AttrGenAISystem, strVal("openai"))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIRequestModel, strVal("gpt-4o"))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIResponseModel, strVal("gpt-4o"))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIResponseID, strVal("chatcmpl-123"))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIUsageInputTokens, int64Val(10))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIUsageOutputTokens, int64Val(20))
+	testutil.AssertSpanStatus(t, span, codes.Ok)
 }
 
 func TestInference_Error(t *testing.T) {
@@ -80,10 +80,10 @@ func TestInference_Error(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertSpanStatus(t, span, codes.Error)
-	conformancetest.AssertAttr(t, span, semconv.AttrErrorType, strVal("unknown"))
+	testutil.AssertSpanStatus(t, span, codes.Error)
+	testutil.AssertAttr(t, span, semconv.AttrErrorType, strVal("unknown"))
 	// Verify the raw error message is NOT in the span.
-	conformancetest.AssertNoSentinel(t, span, []string{"some secret error message with PII"})
+	testutil.AssertNoSentinel(t, span, []string{"some secret error message with PII"})
 }
 
 func TestInference_NopWhenMissingMetadata(t *testing.T) {
@@ -122,7 +122,7 @@ func TestInference_Cancelled(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertAttr(t, span, semconv.AttrErrorType, strVal("cancelled"))
+	testutil.AssertAttr(t, span, semconv.AttrErrorType, strVal("cancelled"))
 }
 
 func TestInference_IdempotentEnd(t *testing.T) {

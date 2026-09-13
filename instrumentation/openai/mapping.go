@@ -49,11 +49,12 @@ func mapCompletionUsage(u oai.CompletionUsage) otelgenai.Usage {
 }
 
 // mapChatRequest builds the provider-neutral otelgenai.Request from
-// Chat Completion parameters.
-func mapChatRequest(params oai.ChatCompletionNewParams, streaming bool) otelgenai.Request {
+// Chat Completion parameters. The system parameter overrides the
+// gen_ai.system attribute for OpenAI-compatible providers.
+func mapChatRequest(params oai.ChatCompletionNewParams, streaming bool, system string) otelgenai.Request {
 	req := otelgenai.Request{
 		Operation: otelgenai.Operation(semconv.OperationChat),
-		Provider:  semconv.GenAISystemOpenAI,
+		Provider:  system,
 		Model:     string(params.Model),
 		Streaming: streaming,
 	}
@@ -93,11 +94,12 @@ func mapEmbeddingResponse(r *oai.CreateEmbeddingResponse) otelgenai.Response {
 }
 
 // mapEmbeddingRequest builds the provider-neutral otelgenai.Request
-// from Embedding parameters.
-func mapEmbeddingRequest(params oai.EmbeddingNewParams) otelgenai.Request {
+// from Embedding parameters. The system parameter overrides the
+// gen_ai.system attribute for OpenAI-compatible providers.
+func mapEmbeddingRequest(params oai.EmbeddingNewParams, system string) otelgenai.Request {
 	return otelgenai.Request{
 		Operation: otelgenai.Operation(semconv.OperationEmbeddings),
-		Provider:  semconv.GenAISystemOpenAI,
+		Provider:  system,
 		Model:     string(params.Model),
 	}
 }
@@ -132,11 +134,12 @@ func mapResponseResponse(r *responses.Response) otelgenai.Response {
 }
 
 // mapResponseRequest builds the provider-neutral otelgenai.Request from
-// Responses API parameters.
-func mapResponseRequest(params responses.ResponseNewParams, streaming bool) otelgenai.Request {
+// Responses API parameters. The system parameter overrides the
+// gen_ai.system attribute for OpenAI-compatible providers.
+func mapResponseRequest(params responses.ResponseNewParams, streaming bool, system string) otelgenai.Request {
 	req := otelgenai.Request{
 		Operation: otelgenai.Operation(semconv.OperationGenerateContent),
-		Provider:  semconv.GenAISystemOpenAI,
+		Provider:  system,
 		Model:     string(params.Model),
 		Streaming: streaming,
 	}

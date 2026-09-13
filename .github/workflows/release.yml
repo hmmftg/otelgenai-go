@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       module:
-        description: "Module to release (root, openai, anthropic)"
+        description: "Module to release (root, openai, anthropic, google-genai)"
         required: true
         type: choice
         options:
           - root
           - openai
           - anthropic
+          - google-genai
       version:
         description: "Version tag (e.g. v0.1.0)"
         required: true
@@ -38,12 +39,14 @@ jobs:
           go build ./...
           cd instrumentation/openai && go mod tidy && go vet ./... && go test ./... && go build ./...
           cd ../anthropic && go mod tidy && go vet ./... && go test ./... && go build ./...
+          cd ../google-genai && go mod tidy && go vet ./... && go test ./... && go build ./...
 
       - name: Validate downstream consumers
         run: |
           cd test/downstream/root-only && GOWORK=off go build ./...
           cd ../openai-only && GOWORK=off go build ./...
           cd ../anthropic-only && GOWORK=off go build ./...
+          cd ../google-genai-only && GOWORK=off go build ./...
 
       - name: Determine tag
         id: tag
@@ -57,6 +60,9 @@ jobs:
               ;;
             anthropic)
               echo "tag=instrumentation/anthropic/${{ inputs.version }}" >> $GITHUB_OUTPUT
+              ;;
+            google-genai)
+              echo "tag=instrumentation/google-genai/${{ inputs.version }}" >> $GITHUB_OUTPUT
               ;;
           esac
 

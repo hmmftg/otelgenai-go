@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/conformancetest"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
+	"github.com/hmmftg/otelgenai-go/testutil"
 )
 
 func TestAgent_Success(t *testing.T) {
@@ -29,9 +29,9 @@ func TestAgent_Success(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertSpanName(t, span, "invoke_agent my-agent")
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIAgentName, strVal("my-agent"))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIAgentDescription, strVal("test agent"))
+	testutil.AssertSpanName(t, span, "invoke_agent my-agent")
+	testutil.AssertAttr(t, span, semconv.AttrGenAIAgentName, strVal("my-agent"))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIAgentDescription, strVal("test agent"))
 }
 
 func TestAgent_NoName(t *testing.T) {
@@ -45,7 +45,7 @@ func TestAgent_NoName(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
-	conformancetest.AssertSpanName(t, spans[0], "invoke_agent")
+	testutil.AssertSpanName(t, spans[0], "invoke_agent")
 }
 
 func TestAgent_Error(t *testing.T) {
@@ -60,7 +60,7 @@ func TestAgent_Error(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertAttr(t, span, semconv.AttrErrorType, strVal("unknown"))
+	testutil.AssertAttr(t, span, semconv.AttrErrorType, strVal("unknown"))
 }
 
 func TestAgent_NestedInferenceCounted(t *testing.T) {
@@ -101,10 +101,10 @@ func TestTool_Success(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertSpanName(t, span, "execute_tool get_weather")
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIToolName, strVal("get_weather"))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIToolType, strVal("function"))
-	conformancetest.AssertAttr(t, span, semconv.AttrGenAIToolCallID, strVal("call_123"))
+	testutil.AssertSpanName(t, span, "execute_tool get_weather")
+	testutil.AssertAttr(t, span, semconv.AttrGenAIToolName, strVal("get_weather"))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIToolType, strVal("function"))
+	testutil.AssertAttr(t, span, semconv.AttrGenAIToolCallID, strVal("call_123"))
 }
 
 func TestTool_Error(t *testing.T) {
@@ -119,7 +119,7 @@ func TestTool_Error(t *testing.T) {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	span := spans[0]
-	conformancetest.AssertAttr(t, span, semconv.AttrErrorType, strVal("unknown"))
+	testutil.AssertAttr(t, span, semconv.AttrErrorType, strVal("unknown"))
 }
 
 func TestTool_DefaultType(t *testing.T) {
@@ -133,7 +133,7 @@ func TestTool_DefaultType(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
-	conformancetest.AssertAttr(t, spans[0], semconv.AttrGenAIToolType, strVal("function"))
+	testutil.AssertAttr(t, spans[0], semconv.AttrGenAIToolType, strVal("function"))
 }
 
 func TestTraceTool_Generic(t *testing.T) {
@@ -151,7 +151,7 @@ func TestTraceTool_Generic(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
-	conformancetest.AssertSpanName(t, spans[0], "execute_tool compute")
+	testutil.AssertSpanName(t, spans[0], "execute_tool compute")
 }
 
 func TestAgentTool_NestedCounting(t *testing.T) {

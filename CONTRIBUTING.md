@@ -26,8 +26,9 @@ prompts, responses, or secrets is worse than no telemetry.
 - `instrumentation/openai` and `instrumentation/anthropic` are
   independently versioned modules. Each depends only on the root module
   and its official provider SDK.
-- `internal/semconv`, `internal/safety`, and `internal/conformancetest`
-  are internal packages and are not part of the public API.
+- `internal/semconv` and `internal/safety` are internal packages and
+  are not part of the public API. The public `testutil` package provides
+  recorder and assertion helpers for testing instrumentation.
 
 ## Safety rules for all changes
 
