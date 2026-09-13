@@ -53,6 +53,23 @@ func agentObserverFromContext(ctx context.Context) *agentObserver {
 	return v
 }
 
+// WithoutAgentObserver returns a context derived from ctx with the
+// nearest agent observer removed. All other context values,
+// cancellation, deadlines, and trace context are preserved.
+//
+// This is intended for cross-boundary instrumentation scenarios (such
+// as MCP server middleware) where the remote trace context should be
+// carried but the local agent's tool/inference counters must not be
+// incremented by the remote side.
+func WithoutAgentObserver(ctx context.Context) context.Context {
+	if agentObserverFromContext(ctx) == nil {
+		return ctx
+	}
+	// Create a child context that shadows the agent observer key with
+	// nil, effectively removing it for downstream lookups.
+	return context.WithValue(ctx, agentCtxKey{}, (*agentObserver)(nil))
+}
+
 type inferenceOpCtxKey struct{}
 
 func contextWithInferenceOp(ctx context.Context, op *InferenceOperation) context.Context {

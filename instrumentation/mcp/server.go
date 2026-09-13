@@ -12,11 +12,12 @@ import (
 // as INTERNAL GenAI operations. It extracts W3C trace context from
 // request params._meta to establish the remote parent span.
 //
-// The server middleware extracts only the remote trace context from
-// _meta and creates a fresh context for the server operation. It does
-// NOT propagate local agentObserver state across the protocol boundary.
-// This ensures server-side tools/call does not increment any local
-// agent's tool-call counter.
+// The server middleware derives the operation context from the incoming
+// SDK request context, preserving cancellation, deadlines, and other
+// request-scoped values. It replaces only the trace parent with the
+// remote trace context extracted from _meta, and strips the local
+// agentObserver so that server-side tools/call does not increment any
+// local agent's tool-call counter.
 //
 // Non-instrumented methods pass through completely unchanged: no span
 // creation, no context modification, no _meta extraction.
@@ -31,15 +32,21 @@ func ServerMiddleware(instr *otelgenai.Instrumenter) mcp.Middleware {
 				return next(ctx, method, req)
 			}
 
-			// Extract remote trace context from _meta into a FRESH context.
-			// Do NOT use the original ctx as base, because it may contain
-			// local agentObserver state that must not propagate across the
-			// protocol boundary. Only the remote trace context is carried.
+			// Extract remote trace context from _meta and apply it to
+			// the incoming context. This preserves cancellation, deadlines,
+			// and other request-scoped values from the SDK while replacing
+			// only the trace parent.
 			var meta mcp.Meta
 			if req != nil && req.GetParams() != nil {
 				meta = mcp.Meta(req.GetParams().GetMeta())
 			}
-			ctx = ExtractTraceContext(context.Background(), meta)
+			ctx = ExtractTraceContext(ctx, meta)
+
+			// Strip the local agentObserver so server-side operations
+			// do not increment any local agent's counters. The remote
+			// trace context above is the only telemetry state that
+			// crosses the protocol boundary.
+			ctx = otelgenai.WithoutAgentObserver(ctx)
 
 			target := extractTarget(method, req)
 			ctx, op := startOperation(ctx, instr, method, target)

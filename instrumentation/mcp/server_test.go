@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/hmmftg/otelgenai-go"
 	"github.com/hmmftg/otelgenai-go/testutil"
@@ -294,5 +295,133 @@ func TestServerMiddleware_RemoteParentExtraction(t *testing.T) {
 	if serverSpan.Parent().SpanID() != clientSpanFound.SpanContext().SpanID() {
 		t.Errorf("server span parent mismatch: got %q, want %q",
 			serverSpan.Parent().SpanID(), clientSpanFound.SpanContext().SpanID())
+	}
+}
+
+// TestServerMiddleware_PreservesCancellation verifies that the server
+// middleware preserves cancellation from the incoming SDK request context.
+func TestServerMiddleware_PreservesCancellation(t *testing.T) {
+	defer setupTestPropagator()()
+
+	rec := testutil.NewRecorder()
+	defer rec.Shutdown(context.Background())
+
+	instr, err := otelgenai.New(
+		otelgenai.WithTracerProvider(rec.TracerProvider()),
+		otelgenai.WithMeterProvider(rec.MeterProvider()),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Create a cancellable context simulating the SDK request context.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately.
+
+	// The handler should observe the cancelled context.
+	handlerObservedCancel := false
+	cancelNext := func(handlerCtx context.Context, _ string, _ mcp.Request) (mcp.Result, error) {
+		if handlerCtx.Err() == context.Canceled {
+			handlerObservedCancel = true
+		}
+		return nil, nil
+	}
+
+	mw := ServerMiddleware(instr)
+	handler := mw(cancelNext)
+
+	req := &mcp.ServerRequest[*mcp.CallToolParamsRaw]{
+		Params: &mcp.CallToolParamsRaw{Name: "get_weather"},
+	}
+	_, _ = handler(ctx, MethodToolsCall, req)
+
+	if !handlerObservedCancel {
+		t.Error("server handler did not observe cancellation from incoming context")
+	}
+}
+
+// TestServerMiddleware_PreservesDeadline verifies that the server
+// middleware preserves deadlines from the incoming SDK request context.
+func TestServerMiddleware_PreservesDeadline(t *testing.T) {
+	defer setupTestPropagator()()
+
+	rec := testutil.NewRecorder()
+	defer rec.Shutdown(context.Background())
+
+	instr, err := otelgenai.New(
+		otelgenai.WithTracerProvider(rec.TracerProvider()),
+		otelgenai.WithMeterProvider(rec.MeterProvider()),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Create a context with a deadline simulating the SDK request context.
+	deadline := time.Now().Add(50 * time.Millisecond)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+
+	// The handler should observe the deadline.
+	handlerObservedDeadline := false
+	deadlineNext := func(handlerCtx context.Context, _ string, _ mcp.Request) (mcp.Result, error) {
+		if dl, ok := handlerCtx.Deadline(); ok && dl.Equal(deadline) {
+			handlerObservedDeadline = true
+		}
+		return nil, nil
+	}
+
+	mw := ServerMiddleware(instr)
+	handler := mw(deadlineNext)
+
+	req := &mcp.ServerRequest[*mcp.CallToolParamsRaw]{
+		Params: &mcp.CallToolParamsRaw{Name: "get_weather"},
+	}
+	_, _ = handler(ctx, MethodToolsCall, req)
+
+	if !handlerObservedDeadline {
+		t.Error("server handler did not observe deadline from incoming context")
+	}
+}
+
+// TestServerMiddleware_PreservesContextValues verifies that the server
+// middleware preserves arbitrary context values from the incoming
+// SDK request context (while still stripping the agent observer).
+func TestServerMiddleware_PreservesContextValues(t *testing.T) {
+	defer setupTestPropagator()()
+
+	rec := testutil.NewRecorder()
+	defer rec.Shutdown(context.Background())
+
+	instr, err := otelgenai.New(
+		otelgenai.WithTracerProvider(rec.TracerProvider()),
+		otelgenai.WithMeterProvider(rec.MeterProvider()),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	type testKey struct{}
+	const testValue = "request-scoped-value"
+	ctx := context.WithValue(context.Background(), testKey{}, testValue)
+
+	// The handler should observe the context value.
+	handlerObservedValue := false
+	valueNext := func(handlerCtx context.Context, _ string, _ mcp.Request) (mcp.Result, error) {
+		if v, ok := handlerCtx.Value(testKey{}).(string); ok && v == testValue {
+			handlerObservedValue = true
+		}
+		return nil, nil
+	}
+
+	mw := ServerMiddleware(instr)
+	handler := mw(valueNext)
+
+	req := &mcp.ServerRequest[*mcp.CallToolParamsRaw]{
+		Params: &mcp.CallToolParamsRaw{Name: "get_weather"},
+	}
+	_, _ = handler(ctx, MethodToolsCall, req)
+
+	if !handlerObservedValue {
+		t.Error("server handler did not observe context value from incoming context")
 	}
 }
