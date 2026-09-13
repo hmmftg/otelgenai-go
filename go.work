@@ -5,4 +5,5 @@ use (
 	./instrumentation/openai
 	./instrumentation/anthropic
 	./instrumentation/google-genai
+	./instrumentation/mcp
 )

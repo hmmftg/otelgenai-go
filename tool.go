@@ -16,9 +16,10 @@ import (
 
 // ToolRequest describes a client-side tool execution.
 type ToolRequest struct {
-	Name string
-	Type string
-	ID   string
+	Name  string
+	Type  string
+	ID    string
+	Attrs []attribute.KeyValue
 }
 
 // ToolOperation represents an in-flight tool execution span.
@@ -57,6 +58,9 @@ func (in *Instrumenter) StartTool(ctx context.Context, req ToolRequest) (context
 	attrs = append(attrs, attribute.String(semconv.AttrGenAIToolType, toolType))
 	if req.ID != "" {
 		attrs = append(attrs, attribute.String(semconv.AttrGenAIToolCallID, req.ID))
+	}
+	if len(req.Attrs) > 0 {
+		attrs = append(attrs, req.Attrs...)
 	}
 
 	// Add enclosing agent name if available.
