@@ -54,13 +54,15 @@ func agentObserverFromContext(ctx context.Context) *agentObserver {
 }
 
 // WithoutAgentObserver returns a context derived from ctx with the
-// nearest agent observer removed. All other context values,
-// cancellation, deadlines, and trace context are preserved.
+// local agent observer removed. It removes only the agent-observer
+// state stored by StartAgent; all other context values, cancellation,
+// deadlines, and trace context are preserved unchanged.
 //
 // This is intended for cross-boundary instrumentation scenarios (such
 // as MCP server middleware) where the remote trace context should be
 // carried but the local agent's tool/inference counters must not be
-// incremented by the remote side.
+// incremented by the remote side. The agent observer is a private
+// core context value, so callers cannot strip it without this helper.
 func WithoutAgentObserver(ctx context.Context) context.Context {
 	if agentObserverFromContext(ctx) == nil {
 		return ctx
