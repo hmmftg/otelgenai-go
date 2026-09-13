@@ -87,9 +87,17 @@ func mapUsageMetadata(u *genai.GenerateContentResponseUsageMetadata) otelgenai.U
 
 // HasGeneratedOutput reports whether the response contains at least one
 // non-empty generated output part. It inspects Candidates[].Content.Parts[]
-// for non-empty text parts. This prevents metadata-only responses (usage,
-// model version, finish reason) from being treated as output chunks for
-// streaming timing purposes.
+// for non-empty text parts only. This prevents metadata-only responses
+// (usage, model version, finish reason) from being treated as output chunks
+// for streaming timing purposes.
+//
+// v0.2 constraint: only text parts are counted as generated output.
+// Non-text parts (inline data/images, function calls, function responses,
+// code execution results, file data, etc.) are intentionally NOT counted
+// in v0.2. This is a deliberate narrowing to avoid over-claiming output
+// detection for modalities that may require different timing semantics.
+// Future versions may expand this predicate to cover additional generated
+// part types.
 func HasGeneratedOutput(resp *genai.GenerateContentResponse) bool {
 	if resp == nil {
 		return false

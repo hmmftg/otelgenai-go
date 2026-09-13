@@ -276,6 +276,14 @@ func TestHasGeneratedOutput(t *testing.T) {
 		{"empty text", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{Text: ""}}}}}}, false},
 		{"non-empty text", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{Text: "hello"}}}}}}, true},
 		{"metadata only", &genai.GenerateContentResponse{ModelVersion: "gemini-2.5-flash", UsageMetadata: &genai.GenerateContentResponseUsageMetadata{PromptTokenCount: 1}}, false},
+		// v0.2 constraint: non-text parts are NOT counted as generated output.
+		{"inline data (image) not counted", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{InlineData: &genai.Blob{MIMEType: "image/png", Data: []byte("fake")}}}}}}}, false},
+		{"function call not counted", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{FunctionCall: &genai.FunctionCall{Name: "get_weather"}}}}}}}, false},
+		{"function response not counted", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{FunctionResponse: &genai.FunctionResponse{Name: "get_weather"}}}}}}}, false},
+		{"code execution result not counted", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{CodeExecutionResult: &genai.CodeExecutionResult{}}}}}}}, false},
+		{"executable code not counted", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{ExecutableCode: &genai.ExecutableCode{}}}}}}}, false},
+		{"file data not counted", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{FileData: &genai.FileData{}}}}}}}, false},
+		{"text mixed with non-text counts", &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []*genai.Part{{InlineData: &genai.Blob{}}, {Text: "hello"}}}}}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
