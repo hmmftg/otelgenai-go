@@ -6,4 +6,5 @@ use (
 	./instrumentation/anthropic
 	./instrumentation/google-genai
 	./instrumentation/mcp
+	./instrumentation/adk
 )

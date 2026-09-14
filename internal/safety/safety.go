@@ -21,6 +21,10 @@ const (
 	ReasonClassifierPanic   Reason = "classifier.panic"
 	ReasonDiagnosticPanic   Reason = "diagnostic.panic"
 	ReasonResolverPanic     Reason = "pricing.resolver.panic"
+	ReasonModelStateConflict      Reason = "model.state.conflict"
+	ReasonToolSystemResolverPanic Reason = "tool_system.resolver.panic"
+	ReasonInvalidToolSpan          Reason = "tool.span.invalid"
+	ReasonInvalidMetricValue       Reason = "metric.value.invalid"
 )
 
 // Diagnostic is a typed diagnostic record containing only a stage
