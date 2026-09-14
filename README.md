@@ -175,6 +175,30 @@ resp, err := otelgenai.TraceInference(ctx, instr, otelgenai.Request{
 })
 ```
 
+### Estimated cost (v0.4)
+
+Pricing is opt-in. Configure a `PricingResolver` to emit
+`gen_ai.usage.estimated_cost` as a span attribute:
+
+```go
+import "github.com/hmmftg/otelgenai-go/pricing"
+
+resolver := pricing.NewStaticResolver(map[pricing.ModelPricingKey]pricing.Price{
+    {System: "openai", Model: "gpt-4o"}: {
+        InputPerToken:  0.00001,
+        OutputPerToken: 0.00003,
+    },
+})
+
+instr, err := otelgenai.New(otelgenai.WithPricingResolver(resolver))
+```
+
+Cost is estimated, not authoritative billing. All pricing failures
+(unknown model, invalid price, inconsistent usage, resolver panic)
+result in no cost attribute; the inference operation is never affected.
+See [docs/pricing.md](docs/pricing.md) for the full token accounting
+model and API.
+
 ## Emitted telemetry
 
 ### Spans

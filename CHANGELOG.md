@@ -10,6 +10,39 @@ development.
 
 ## [Unreleased]
 
+### Added (v0.4)
+
+- Optional pricing resolver (`pricing` subpackage) for estimated cost
+  derivation from token usage, recorded as a span attribute only
+  (`gen_ai.usage.estimated_cost`, float64, USD).
+  - `Price`, `ModelPricingKey`, `PricingResolver`, `PriceableUsage` types.
+  - `Normalize` validates aggregate/subset consistency with overflow-safe,
+    subtraction-based validation (cache-read and cache-write are subsets of
+    aggregate input).
+  - `Estimate` computes cost from normalized usage and price.
+  - `ValidatePrice` rejects negative, NaN, and Inf price values.
+  - `ValidCost` rejects NaN and Inf computed costs from float64 overflow.
+  - `StaticResolver` with map-copy ownership semantics.
+  - `WithPricingResolver` option on `Instrumenter`.
+  - Resolver panic isolation via `safety.GuardedCallValue` with
+    `ReasonResolverPanic` diagnostic.
+  - No new metric instrument (deferred until upstream stabilizes).
+- testutil cardinality/safety validation helpers: `AssertLowCardinalityModel`,
+  `AssertNoDynamicSpanNames`, `AssertNoRawErrors`,
+  `AssertNoResourceURIsInSpanNames`, `AssertNoContentInAttributes`
+  (heuristic detectors for regression testing, not formal cardinality
+  analysis).
+- testutil cost assertions: `AssertEstimatedCost`, `AssertNoEstimatedCost`.
+- Cross-adapter error classification contract documentation
+  (`docs/error_contract.md`).
+
+### Changed (v0.4)
+
+- `Usage` Godoc updated from "provider-reported billable usage; the library
+  never estimates" to "provider-reported token usage. The library does not
+  infer missing usage values."
+- `docs/roadmap.md` updated: v0.3 marked as released, v0.4 section expanded.
+
 ### Added (v0.3)
 
 - MCP adapter module (`instrumentation/mcp`) providing instrumentation for

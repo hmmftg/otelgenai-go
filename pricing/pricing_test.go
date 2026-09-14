@@ -8,9 +8,9 @@ import (
 
 func TestNormalize_BasicValid(t *testing.T) {
 	tests := []struct {
-		name                              string
+		name                                 string
 		input, output, cacheRead, cacheWrite int64
-		wantNonCached                  int64
+		wantNonCached                        int64
 	}{
 		{"input only", 1000, 500, 0, 0, 1000},
 		{"output only", 0, 500, 0, 0, 0},
@@ -52,7 +52,7 @@ func TestNormalize_BasicValid(t *testing.T) {
 
 func TestNormalize_Invalid(t *testing.T) {
 	tests := []struct {
-		name                              string
+		name                                 string
 		input, output, cacheRead, cacheWrite int64
 	}{
 		{"cacheRead > input", 100, 50, 150, 0},
@@ -106,7 +106,7 @@ func TestNormalize_SubtractionAtLimit(t *testing.T) {
 func TestEstimate(t *testing.T) {
 	price := Price{
 		InputPerToken:      0.00001,
-		OutputPerToken:      0.00003,
+		OutputPerToken:     0.00003,
 		CacheReadPerToken:  0.000001,
 		CacheWritePerToken: 0.000002,
 	}

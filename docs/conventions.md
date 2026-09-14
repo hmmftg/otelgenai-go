@@ -43,6 +43,20 @@ the convention contract.
 | Cache read tokens | `gen_ai.usage.cache_read_tokens` |
 | Reasoning tokens | `gen_ai.usage.reasoning_tokens` |
 
+### Cost attributes (repository-defined extension)
+
+| Attribute | Key | Description |
+|-----------|-----|-------------|
+| Estimated cost | `gen_ai.usage.estimated_cost` | Estimated cost in USD, derived from token usage via a configured `PricingResolver`. |
+
+This attribute is a **repository-defined extension** and is not part of
+the pinned upstream semantic-convention contract. Upstream cost
+conventions are still under active development; v0.4 therefore uses a
+repository-defined span attribute rather than adopting an unstable
+upstream cost convention. It does not introduce metric cardinality
+because it is recorded only on spans. See [docs/pricing.md](pricing.md)
+for details.
+
 ### Response attributes
 
 | Attribute | Key |

@@ -19,8 +19,8 @@ const (
 	ReasonProjectorInvalid  Reason = "projector.invalid_shape"
 	ReasonProjectorBadJSON  Reason = "projector.invalid_json"
 	ReasonClassifierPanic   Reason = "classifier.panic"
-	ReasonDiagnosticPanic  Reason = "diagnostic.panic"
-	ReasonResolverPanic    Reason = "pricing.resolver.panic"
+	ReasonDiagnosticPanic   Reason = "diagnostic.panic"
+	ReasonResolverPanic     Reason = "pricing.resolver.panic"
 )
 
 // Diagnostic is a typed diagnostic record containing only a stage

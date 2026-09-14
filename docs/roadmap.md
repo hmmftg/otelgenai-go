@@ -11,7 +11,7 @@ on adoption feedback and upstream semantic-convention evolution.
 - OpenAI-compatible provider support via `WithSystem`
 - Google GenAI adapter (`GenerateContent`, `GenerateContentStream`)
 
-## v0.3 (current)
+## v0.3 (released)
 
 - MCP (Model Context Protocol) instrumentation using
   `modelcontextprotocol/go-sdk` (v1.7.0)
@@ -28,9 +28,25 @@ on adoption feedback and upstream semantic-convention evolution.
 - Error classification consistency tests
 - Context propagation tests
 
-## v0.4 (planned direction)
+## v0.4 (current)
 
-- Cost/pricing tracking for token usage
+- Optional pricing resolver (`pricing` subpackage) for estimated cost
+  derivation from token usage
+  - `gen_ai.usage.estimated_cost` span attribute (repository-defined
+    extension, not part of the pinned upstream semantic-convention
+    contract)
+  - Overflow-safe subset accounting for cache-read and cache-write
+    tokens (subtraction-based validation)
+  - Price validation (`ValidatePrice`) rejects negative, NaN, Inf
+  - Cost validation (`ValidCost`) rejects NaN, Inf from float64 overflow
+  - `StaticResolver` with map-copy ownership semantics
+  - Resolver panic isolation via `safety.GuardedCallValue`
+  - No new metric instrument (deferred until upstream stabilizes)
+- testutil cardinality/safety validation helpers (heuristic detectors
+  for regression testing)
+- Cross-adapter error classification contract documentation
+- `Usage` Godoc corrected: "provider-reported token usage" (not
+  "billable usage")
 
 ## v0.5 (planned direction)
 

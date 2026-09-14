@@ -2,6 +2,61 @@
 
 This document describes how to migrate between versions of otelgenai-go.
 
+## Migrating to v0.4
+
+v0.4 adds optional pricing/cost estimation and telemetry quality
+helpers while preserving backward compatibility with v0.3.
+
+### New features
+
+- **Pricing subpackage**: new `pricing` package for estimated cost
+  derivation from token usage.
+  - `WithPricingResolver` option on `Instrumenter`.
+  - `gen_ai.usage.estimated_cost` span attribute (repository-defined
+    extension, not part of the pinned upstream semantic-convention
+    contract).
+  - `StaticResolver` for simple price-map-based resolution.
+  - Custom `PricingResolver` implementations for alias resolution,
+    regional pricing, etc.
+- **testutil cardinality helpers**: `AssertLowCardinalityModel`,
+  `AssertNoDynamicSpanNames`, `AssertNoRawErrors`,
+  `AssertNoResourceURIsInSpanNames`, `AssertNoContentInAttributes`.
+- **testutil cost assertions**: `AssertEstimatedCost`,
+  `AssertNoEstimatedCost`.
+- **Error contract**: documented cross-adapter error classification
+  contract in `docs/error_contract.md`.
+
+### Using the pricing resolver
+
+```go
+import (
+    "github.com/hmmftg/otelgenai-go"
+    "github.com/hmmftg/otelgenai-go/pricing"
+)
+
+resolver := pricing.NewStaticResolver(map[pricing.ModelPricingKey]pricing.Price{
+    {System: "openai", Model: "gpt-4o"}: {
+        InputPerToken:  0.00001,
+        OutputPerToken: 0.00003,
+    },
+})
+
+instr, err := otelgenai.New(
+    otelgenai.WithPricingResolver(resolver),
+)
+```
+
+### Behavior notes
+
+- Pricing is opt-in. If no resolver is configured, no cost telemetry is
+  emitted; only a nil check remains.
+- Cost calculation never fails the inference operation. All pricing
+  failures (unknown model, invalid price, inconsistent usage, resolver
+  panic) result in no cost attribute being emitted.
+- The `Usage` Godoc was updated from "provider-reported billable usage"
+  to "provider-reported token usage. The library does not infer missing
+  usage values."
+
 ## Migrating to v0.3
 
 v0.3 adds MCP instrumentation and core hardening while preserving

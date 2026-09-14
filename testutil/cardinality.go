@@ -26,7 +26,7 @@ var contentCaptureKeys = []string{
 // Dynamic ID patterns that should not appear in span names or model
 // attributes.
 var (
-	uuidPattern   = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	uuidPattern    = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 	longHexPattern = regexp.MustCompile(`[0-9a-f]{16,}`)
 )
 
