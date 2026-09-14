@@ -2,6 +2,7 @@ package otelgenai
 
 import (
 	"github.com/hmmftg/otelgenai-go/internal/safety"
+	"github.com/hmmftg/otelgenai-go/pricing"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
@@ -19,6 +20,7 @@ type config struct {
 	projectionLimit        int
 	errorClassifier        ErrorClassifier
 	diagnosticHandler      safety.DiagnosticHandler
+	pricingResolver        pricing.PricingResolver
 	disabled               bool
 }
 
@@ -95,4 +97,18 @@ func WithDiagnosticHandler(h safety.DiagnosticHandler) Option {
 // This is useful for tests, benchmarks, and conditional instrumentation.
 func Disabled() Option {
 	return func(c *config) { c.disabled = true }
+}
+
+// WithPricingResolver enables optional estimated-cost derivation from
+// token usage. When set, the resolver is called for each inference
+// operation to derive an estimated cost, which is recorded as a span
+// attribute (gen_ai.usage.estimated_cost, float64, USD). When unset (the
+// default), no cost telemetry is emitted.
+//
+// Cost is estimated, not authoritative billing. Pricing lookup failures,
+// unknown models, invalid prices, and inconsistent usage data all
+// result in no cost attribute being emitted; the inference operation
+// is never affected.
+func WithPricingResolver(r pricing.PricingResolver) Option {
+	return func(c *config) { c.pricingResolver = r }
 }

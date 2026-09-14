@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -245,4 +246,32 @@ func CollectMetrics(t testing.TB, r *Recorder) metricdata.ResourceMetrics {
 		t.Fatalf("Collect metrics: %v", err)
 	}
 	return rm
+}
+
+// AssertEstimatedCost checks that the span has a gen_ai.usage.estimated_cost
+// attribute matching wantCost (approximate float comparison).
+func AssertEstimatedCost(t testing.TB, span sdktrace.ReadOnlySpan, wantCost float64) {
+	t.Helper()
+	for _, attr := range span.Attributes() {
+		if string(attr.Key) == "gen_ai.usage.estimated_cost" {
+			got := attr.Value.AsFloat64()
+			if math.IsNaN(got) || math.IsInf(got, 0) {
+				t.Errorf("estimated_cost: got %v, want %v", got, wantCost)
+				return
+			}
+			if math.Abs(got-wantCost) > 1e-9 {
+				t.Errorf("estimated_cost: got %v, want %v", got, wantCost)
+			}
+			return
+		}
+	}
+	t.Errorf("estimated_cost: attribute not found on span")
+}
+
+// AssertNoEstimatedCost checks that the span does NOT have a
+// gen_ai.usage.estimated_cost attribute (for no-resolver / unknown-model /
+// inconsistent-usage cases).
+func AssertNoEstimatedCost(t testing.TB, span sdktrace.ReadOnlySpan) {
+	t.Helper()
+	AssertAttrNotPresent(t, span, "gen_ai.usage.estimated_cost")
 }

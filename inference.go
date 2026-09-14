@@ -11,7 +11,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
+	"github.com/hmmftg/otelgenai-go/pricing"
 )
 
 // Operation is the canonical GenAI operation name.
@@ -50,8 +52,8 @@ type Response struct {
 	OutputMessages []Message
 }
 
-// Usage holds provider-reported token usage. All fields are
-// provider-reported billable usage; the library never estimates.
+// Usage holds provider-reported token usage. The library does not
+// infer missing usage values.
 type Usage struct {
 	InputTokens      int64
 	OutputTokens     int64
@@ -209,6 +211,35 @@ func (op *InferenceOperation) End(resp Response, err error) {
 	}
 	if resp.Usage.ReasoningTokens > 0 {
 		attrs = append(attrs, attribute.Int64(semconv.AttrGenAIUsageReasoningTokens, resp.Usage.ReasoningTokens))
+	}
+
+	// Estimate cost if a pricing resolver is configured.
+	if op.in.pricing != nil {
+		key := pricing.ModelPricingKey{System: op.provider, Model: op.model}
+		type resolveResult struct {
+			price pricing.Price
+			ok    bool
+		}
+		result, perr := safety.GuardedCallValue(func() (resolveResult, error) {
+			p, ok := op.in.pricing.Resolve(key)
+			return resolveResult{price: p, ok: ok}, nil
+		})
+		if perr != nil {
+			safety.GuardedDiagnostic(op.in.diag, safety.Diagnostic{
+				Stage: "pricing", Reason: safety.ReasonResolverPanic,
+			})
+		} else if result.ok {
+			usage, valid := pricing.Normalize(
+				resp.Usage.InputTokens, resp.Usage.OutputTokens,
+				resp.Usage.CacheReadTokens, resp.Usage.CacheWriteTokens,
+			)
+			if valid && pricing.ValidatePrice(result.price) {
+				cost := pricing.Estimate(usage, result.price)
+				if pricing.ValidCost(cost) && cost > 0 {
+					attrs = append(attrs, attribute.Float64("gen_ai.usage.estimated_cost", cost))
+				}
+			} // else: inconsistent usage or invalid price, omit cost
+		} // else: unknown model, omit cost
 	}
 
 	// Opt-in output content projection.

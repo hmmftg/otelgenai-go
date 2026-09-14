@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/hmmftg/otelgenai-go/internal/safety"
+	"github.com/hmmftg/otelgenai-go/pricing"
 )
 
 // Instrumenter is the framework-neutral entry point for GenAI
@@ -24,6 +25,7 @@ type Instrumenter struct {
 	cfg        config
 	classifier ErrorClassifier
 	diag       safety.DiagnosticHandler
+	pricing    pricing.PricingResolver
 }
 
 // New creates a new Instrumenter with the given options. All metric
@@ -49,6 +51,7 @@ func New(opts ...Option) (*Instrumenter, error) {
 			cfg:        cfg,
 			classifier: cfg.errorClassifier,
 			diag:       cfg.diagnosticHandler,
+			pricing:    cfg.pricingResolver,
 		}, nil
 	}
 
@@ -72,6 +75,7 @@ func New(opts ...Option) (*Instrumenter, error) {
 		cfg:        cfg,
 		classifier: cfg.errorClassifier,
 		diag:       cfg.diagnosticHandler,
+		pricing:    cfg.pricingResolver,
 	}, nil
 }
 
