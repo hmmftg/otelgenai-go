@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"google.golang.org/adk/v2/agent"
-	"google.golang.org/adk/v2/model"
 	"google.golang.org/genai"
 
 	"github.com/hmmftg/otelgenai-go"
@@ -15,48 +13,42 @@ import (
 // operation exists. On collision, reports a diagnostic and preserves
 // existing state. Never mutates the generate_content span. Returns
 // (nil, nil) to indicate no replacement.
-func (p *Plugin) beforeModel(ctx agent.Context, req *model.LLMRequest) (*model.LLMResponse, error) {
+func (p *Plugin) beforeModel(ctx callbackContext, modelName string) {
 	key := deriveAgentKey(ctx)
-
-	modelName := ""
-	if req != nil {
-		modelName = req.Model
-	}
 
 	_, ok := p.registry.startModel(key, modelName)
 	if !ok {
 		p.instr.ReportInstrumentationFailure(otelgenai.InstrumentationFailureModelStateConflict)
 	}
-	return nil, nil
 }
 
 // afterModel handles both partial and terminal model responses. For
 // partial responses, it updates cumulative usage state only. For
 // terminal responses, it emits duration, usage, and increments the
 // parent agent inference count exactly once. Never mutates the
-// generate_content span. Returns (nil, nil) to indicate no replacement.
-func (p *Plugin) afterModel(ctx agent.Context, llmResponse *model.LLMResponse, llmResponseError error) (*model.LLMResponse, error) {
+// generate_content span.
+func (p *Plugin) afterModel(ctx callbackContext, usage *genai.GenerateContentResponseUsageMetadata, partial bool, llmResponseError error) {
 	key := deriveAgentKey(ctx)
 	st := p.registry.getModel(key)
 	if st == nil {
-		return nil, nil
+		return
 	}
 
 	// Update cumulative usage from the response.
-	if llmResponse != nil && llmResponse.UsageMetadata != nil {
-		st.usage = mapUsageMetadata(llmResponse.UsageMetadata)
+	if usage != nil {
+		st.usage = mapUsageMetadata(usage)
 	}
 
 	// Terminal condition: non-partial response or error.
-	terminal := (llmResponse != nil && !llmResponse.Partial) || llmResponseError != nil
+	terminal := !partial || llmResponseError != nil
 	if !terminal {
-		return nil, nil
+		return
 	}
 
 	// Terminalize once.
 	termSt := p.registry.endModel(key)
 	if termSt == nil {
-		return nil, nil
+		return
 	}
 
 	duration := time.Since(termSt.start)
@@ -65,16 +57,13 @@ func (p *Plugin) afterModel(ctx agent.Context, llmResponse *model.LLMResponse, l
 	p.instr.RecordInferenceDuration(otelCtx, duration, p.system, termSt.model, otelgenai.Operation("generate_content"))
 	p.instr.RecordInferenceUsage(otelCtx, termSt.usage, p.system, termSt.model, otelgenai.Operation("generate_content"))
 	p.registry.incrementAgentInference(key)
-
-	return nil, nil
 }
 
 // onModelError is observational only. It does not terminalize, emit,
 // mutate, or retain an authoritative error. The terminal AfterModel
-// error remains authoritative. Returns (nil, nil) to indicate no
-// replacement.
-func (p *Plugin) onModelError(ctx agent.Context, llmRequest *model.LLMRequest, llmResponseError error) (*model.LLMResponse, error) {
-	return nil, nil
+// error remains authoritative.
+func (p *Plugin) onModelError() {
+	// No-op: observational only.
 }
 
 // mapUsageMetadata converts ADK's genai UsageMetadata to otelgenai.Usage.

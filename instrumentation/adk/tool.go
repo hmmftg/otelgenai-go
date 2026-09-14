@@ -7,32 +7,39 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"google.golang.org/adk/v2/agent"
-	"google.golang.org/adk/v2/tool"
-
 	"github.com/hmmftg/otelgenai-go"
 	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
 )
+
+// toolNameProvider is the minimal interface the adapter needs from an
+// ADK tool to resolve the tool name.
+type toolNameProvider interface {
+	Name() string
+}
 
 // beforeTool creates tool state keyed by the composite {TraceID, SpanID}
 // of the active execute_tool span. Requires a valid span context;
 // invalid spans fail closed. Sets gen_ai.tool.type unconditionally and
 // resolves gen_ai.system through the configured resolver. Returns
 // (nil, nil) to indicate no replacement.
-func (p *Plugin) beforeTool(ctx agent.Context, t tool.Tool, args map[string]any) (map[string]any, error) {
+func (p *Plugin) beforeTool(ctx context.Context, t toolNameProvider) {
 	key, ok := activeSpanKey(ctx)
 	if !ok {
 		p.instr.ReportInstrumentationFailure(otelgenai.InstrumentationFailureInvalidToolSpan)
-		return nil, nil
+		return
 	}
 
-	agentKey := deriveAgentKey(ctx)
-	_, ok = p.registry.startTool(key, agentKey, ctx.InvocationID(), t.Name())
+	agentKey := agentStateKeyFromContext(ctx)
+	invocationID := invocationIDFromContext(ctx)
+	name := ""
+	if t != nil {
+		name = t.Name()
+	}
+	_, ok = p.registry.startTool(key, agentKey, invocationID, name)
 	if !ok {
-		// Invalid span context; fail closed.
 		p.instr.ReportInstrumentationFailure(otelgenai.InstrumentationFailureInvalidToolSpan)
-		return nil, nil
+		return
 	}
 
 	// Set gen_ai.tool.type = function unconditionally (adapter-owned).
@@ -52,23 +59,21 @@ func (p *Plugin) beforeTool(ctx agent.Context, t tool.Tool, args map[string]any)
 			span.SetAttributes(attribute.String(semconv.AttrGenAISystem, system))
 		}
 	}
-
-	return nil, nil
 }
 
 // afterTool emits tool duration, increments the captured parent agent
 // tool count, classifies the final error, and augments the active
 // execute_tool span with error.type and status. Returns (nil, nil) to
 // indicate no replacement.
-func (p *Plugin) afterTool(ctx agent.Context, t tool.Tool, args, result map[string]any, err error) (map[string]any, error) {
+func (p *Plugin) afterTool(ctx context.Context, err error) {
 	key, ok := activeSpanKey(ctx)
 	if !ok {
-		return nil, nil
+		return
 	}
 
 	st := p.registry.endTool(key)
 	if st == nil {
-		return nil, nil
+		return
 	}
 
 	duration := time.Since(st.start)
@@ -80,13 +85,30 @@ func (p *Plugin) afterTool(ctx agent.Context, t tool.Tool, args, result map[stri
 	// Augment the active execute_tool span with error.type and status.
 	span := trace.SpanFromContext(ctx)
 	classifyAndSetError(span, p.instr, err)
-
-	return nil, nil
 }
 
 // onToolError is observational only. It does not terminalize, emit,
 // delete, or mutate. The AfterTool callback remains authoritative.
-// Returns (nil, nil) to indicate no replacement.
-func (p *Plugin) onToolError(ctx agent.Context, t tool.Tool, args map[string]any, err error) (map[string]any, error) {
-	return nil, nil
+func (p *Plugin) onToolError() {
+	// No-op: observational only.
+}
+
+// agentStateKeyFromContext extracts the agent state key from a context
+// that implements the callbackContext interface. Returns a zero key
+// if the context does not implement it.
+func agentStateKeyFromContext(ctx context.Context) agentStateKey {
+	if cbCtx, ok := ctx.(callbackContext); ok {
+		return deriveAgentKey(cbCtx)
+	}
+	return agentStateKey{}
+}
+
+// invocationIDFromContext extracts the invocation ID from a context
+// that implements the callbackContext interface. Returns empty string
+// if the context does not implement it.
+func invocationIDFromContext(ctx context.Context) string {
+	if cbCtx, ok := ctx.(callbackContext); ok {
+		return cbCtx.InvocationID()
+	}
+	return ""
 }
