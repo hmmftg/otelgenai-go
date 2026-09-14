@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"google.golang.org/adk/v2/agent"
-	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/plugin"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/genai"

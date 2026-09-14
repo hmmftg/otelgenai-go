@@ -87,6 +87,6 @@ func (p *Plugin) afterTool(ctx agent.Context, t tool.Tool, args, result map[stri
 // onToolError is observational only. It does not terminalize, emit,
 // delete, or mutate. The AfterTool callback remains authoritative.
 // Returns (nil, nil) to indicate no replacement.
-func (p *Plugin) onToolError(ctx agent.Context, t tool.Tool, args, result map[string]any, err error) (map[string]any, error) {
+func (p *Plugin) onToolError(ctx agent.Context, t tool.Tool, args map[string]any, err error) (map[string]any, error) {
 	return nil, nil
 }

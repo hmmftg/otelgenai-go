@@ -73,7 +73,7 @@ func (p *Plugin) afterModel(ctx agent.Context, llmResponse *model.LLMResponse, l
 // mutate, or retain an authoritative error. The terminal AfterModel
 // error remains authoritative. Returns (nil, nil) to indicate no
 // replacement.
-func (p *Plugin) onModelError(ctx agent.Context, llmResponse *model.LLMResponse, llmResponseError error) (*model.LLMResponse, error) {
+func (p *Plugin) onModelError(ctx agent.Context, llmRequest *model.LLMRequest, llmResponseError error) (*model.LLMResponse, error) {
 	return nil, nil
 }
 

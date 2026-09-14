@@ -245,12 +245,12 @@ func (r *registry) cleanupInvocation(invocationID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for k, st := range r.agents {
+	for k := range r.agents {
 		if k.InvocationID == invocationID {
 			delete(r.agents, k)
 		}
 	}
-	for k, st := range r.models {
+	for k := range r.models {
 		if k.InvocationID == invocationID {
 			delete(r.models, k)
 		}

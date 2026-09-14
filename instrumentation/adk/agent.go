@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"google.golang.org/genai"
-
-	"github.com/hmmftg/otelgenai-go"
 )
 
 // beforeAgent creates agent state keyed by the callback-visible identity.
