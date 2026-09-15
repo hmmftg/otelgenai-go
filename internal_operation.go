@@ -44,7 +44,7 @@ func (in *Instrumenter) StartInternalOperation(
 		return ctx, nil
 	}
 	spanAttrs := attrs
-	if convID := ConversationIDFromContext(ctx); convID != "" {
+	if convID, ok := ConversationIDFromContext(ctx); ok && convID != "" {
 		spanAttrs = make([]attribute.KeyValue, 0, len(attrs)+1)
 		spanAttrs = append(spanAttrs, attrs...)
 		spanAttrs = append(spanAttrs, attribute.String(semconv.AttrGenAIConversationID, convID))

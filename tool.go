@@ -62,7 +62,7 @@ func (in *Instrumenter) StartTool(ctx context.Context, req ToolRequest) (context
 	if len(req.Attrs) > 0 {
 		attrs = append(attrs, req.Attrs...)
 	}
-	if convID := ConversationIDFromContext(ctx); convID != "" {
+	if convID, ok := ConversationIDFromContext(ctx); ok && convID != "" {
 		attrs = append(attrs, attribute.String(semconv.AttrGenAIConversationID, convID))
 	}
 

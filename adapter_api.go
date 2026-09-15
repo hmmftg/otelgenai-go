@@ -58,7 +58,7 @@ func instrumentationFailureToDiagnostic(f InstrumentationFailure) safety.Diagnos
 	case InstrumentationFailureProviderResolverPanic:
 		return safety.Diagnostic{Stage: "provider", Reason: safety.ReasonProviderResolverPanic}
 	default:
-		return safety.Diagnostic{Stage: "adapter", Reason: "unknown"}
+		return safety.Diagnostic{Stage: "adapter", Reason: safety.ReasonUnknown}
 	}
 }
 

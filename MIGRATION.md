@@ -15,6 +15,9 @@ dependencies on core internals.
   - `WithLoggerProvider` option for explicit logger provider.
   - `WithConversationID` / `ConversationIDFromContext` for conversation
     correlation on spans and events (never on metrics).
+    `WithConversationID(ctx, "")` explicitly clears/shadows an
+    inherited ID; `ConversationIDFromContext` returns `(string, bool)`
+    so callers can distinguish "absent" from "explicitly set".
   - `ProjectedContent` opaque bounded projection via
     `Instrumenter.ProjectContent`.
   - `EmitInferenceDetails`, `EmitToolDetails`, `EmitAgentOccurrence`
@@ -33,6 +36,11 @@ dependencies on core internals.
   default instrumentation scope version.
 - **InternalOperation conversation ID**: `gen_ai.conversation.id` is
   now attached to internal operation spans when present in context.
+- **Public diagnostics API**: `Diagnostic`, `DiagnosticReason`,
+  `DiagnosticHandler`, and fixed `DiagnosticReason*` constants are
+  exported from the core package. `WithDiagnosticHandler` takes this
+  public type; `ReportInstrumentationFailure` still takes the
+  constrained `InstrumentationFailure` enum.
 
 ### Changed behavior
 

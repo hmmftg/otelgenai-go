@@ -158,7 +158,7 @@ func (in *Instrumenter) EmitInferenceDetails(ctx context.Context, d InferenceDet
 
 	conversationID := d.ConversationID
 	if conversationID == "" {
-		conversationID = ConversationIDFromContext(ctx)
+		conversationID, _ = ConversationIDFromContext(ctx)
 	}
 
 	attrs := []attribute.KeyValue{
@@ -249,7 +249,7 @@ func (in *Instrumenter) EmitToolDetails(ctx context.Context, d ToolDetails) {
 
 	conversationID := d.ConversationID
 	if conversationID == "" {
-		conversationID = ConversationIDFromContext(ctx)
+		conversationID, _ = ConversationIDFromContext(ctx)
 	}
 
 	attrs := []attribute.KeyValue{
@@ -314,7 +314,7 @@ func (in *Instrumenter) EmitAgentOccurrence(ctx context.Context, o AgentOccurren
 
 	conversationID := o.ConversationID
 	if conversationID == "" {
-		conversationID = ConversationIDFromContext(ctx)
+		conversationID, _ = ConversationIDFromContext(ctx)
 	}
 
 	attrs := []attribute.KeyValue{

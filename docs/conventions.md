@@ -116,6 +116,12 @@ read from context by `StartInference`, `StartAgent`, `StartTool`, and
 `StartInternalOperation`. It is also carried on correlated events. It
 is never added to metrics to avoid high-cardinality time series.
 
+`WithConversationID(ctx, "")` explicitly clears/shadows an inherited
+ID: `ConversationIDFromContext` then returns `("", true)`, and spans
+and events created from that context carry no `gen_ai.conversation.id`
+attribute. The two-result lookup lets callers distinguish "absent"
+from "explicitly set" (including an explicit clear).
+
 ### Event-only attributes
 
 Correlated events (OTel Logs API) use some attribute names that differ

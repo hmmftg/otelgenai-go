@@ -27,6 +27,7 @@ const (
 	ReasonInvalidMetricValue      Reason = "metric.value.invalid"
 	ReasonInvalidEvent            Reason = "event.invalid"
 	ReasonProviderResolverPanic   Reason = "provider.resolver.panic"
+	ReasonUnknown                 Reason = "unknown"
 )
 
 // Diagnostic is a typed diagnostic record containing only a stage

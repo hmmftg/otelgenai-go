@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
 	"github.com/hmmftg/otelgenai-go/testutil"
 )
@@ -77,8 +76,8 @@ func TestClassifyErrorIsolatesClassifierPanic(t *testing.T) {
 	}
 	instr, _ := newAdapterTestInstrumenter(t,
 		otelgenai.WithErrorClassifier(panicking),
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-			if d.Reason == safety.ReasonClassifierPanic {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+			if d.Reason == otelgenai.DiagnosticReasonClassifierPanic {
 				diags.Add(1)
 			}
 		}),
@@ -101,9 +100,9 @@ func TestClassifyErrorDisabledReturnsUnknown(t *testing.T) {
 
 func TestReportInstrumentationFailureInvokesDiagnosticHandler(t *testing.T) {
 	var mu sync.Mutex
-	var seen []safety.Diagnostic
+	var seen []otelgenai.Diagnostic
 	instr, _ := newAdapterTestInstrumenter(t,
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
 			mu.Lock()
 			seen = append(seen, d)
 			mu.Unlock()
@@ -122,7 +121,7 @@ func TestReportInstrumentationFailureInvokesDiagnosticHandler(t *testing.T) {
 
 func TestReportInstrumentationFailureIsolatedHandlerPanic(t *testing.T) {
 	instr, _ := newAdapterTestInstrumenter(t,
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
 			panic("handler boom")
 		}),
 	)
@@ -134,7 +133,7 @@ func TestReportInstrumentationFailureDisabledIsNoop(t *testing.T) {
 	var count atomic.Int32
 	instr, _ := newAdapterTestInstrumenter(t,
 		otelgenai.Disabled(),
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
 			count.Add(1)
 		}),
 	)
@@ -186,8 +185,8 @@ func TestRecordInferenceDurationRecordsValue(t *testing.T) {
 func TestRecordInferenceDurationNegativeIsOmitted(t *testing.T) {
 	var diags atomic.Int32
 	instr, rec := newAdapterTestInstrumenter(t,
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-			if d.Reason == safety.ReasonInvalidMetricValue {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+			if d.Reason == otelgenai.DiagnosticReasonInvalidMetricValue {
 				diags.Add(1)
 			}
 		}),
@@ -236,8 +235,8 @@ func TestRecordAgentToolCallsRecordsZero(t *testing.T) {
 func TestRecordAgentInferenceCallsNegativeIsOmitted(t *testing.T) {
 	var diags atomic.Int32
 	instr, rec := newAdapterTestInstrumenter(t,
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-			if d.Reason == safety.ReasonInvalidMetricValue {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+			if d.Reason == otelgenai.DiagnosticReasonInvalidMetricValue {
 				diags.Add(1)
 			}
 		}),
@@ -421,8 +420,8 @@ func TestApplySpanOutcome_PanickingClassifier(t *testing.T) {
 		otelgenai.WithErrorClassifier(func(err error) otelgenai.ErrorType {
 			panic("boom")
 		}),
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-			if d.Reason == safety.ReasonClassifierPanic {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+			if d.Reason == otelgenai.DiagnosticReasonClassifierPanic {
 				diags.Add(1)
 			}
 		}),

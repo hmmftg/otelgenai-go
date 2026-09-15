@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
 	"github.com/hmmftg/otelgenai-go/testutil"
 	"go.opentelemetry.io/otel/attribute"
@@ -362,8 +361,8 @@ func TestErrorClassification_PanickingClassifierDuringEnd(t *testing.T) {
 				otelgenai.WithTracerProvider(rec.TracerProvider()),
 				otelgenai.WithMeterProvider(rec.MeterProvider()),
 				otelgenai.WithErrorClassifier(panicking),
-				otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-					if d.Reason == safety.ReasonClassifierPanic {
+				otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+					if d.Reason == otelgenai.DiagnosticReasonClassifierPanic {
 						diags.Add(1)
 					}
 				}),

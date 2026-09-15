@@ -11,9 +11,19 @@ import (
 )
 
 func main() {
-	instr, err := otelgenai.New()
+	// An external consumer must be able to name the diagnostic types.
+	var seen []otelgenai.Diagnostic
+	handler := otelgenai.DiagnosticHandler(func(d otelgenai.Diagnostic) {
+		seen = append(seen, d)
+	})
+	instr, err := otelgenai.New(otelgenai.WithDiagnosticHandler(handler))
 	if err != nil {
 		panic(err)
+	}
+	// An adapter-facing failure maps to a public DiagnosticReason.
+	instr.ReportInstrumentationFailure(otelgenai.InstrumentationFailureInvalidMetricValue)
+	if len(seen) != 1 || seen[0].Reason != otelgenai.DiagnosticReasonInvalidMetricValue {
+		panic("diagnostic not delivered to external consumer")
 	}
 	_, op := instr.StartInference(context.Background(), otelgenai.Request{
 		Operation: otelgenai.Operation("chat"),

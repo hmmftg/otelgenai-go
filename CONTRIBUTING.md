@@ -82,6 +82,14 @@ release workflow with an explicit module selection and version. The
 workflow validates every module but tags only the selected one, so v0.x
 adapters can move at their own cadence while the core stabilizes.
 
+Release order matters: the core module must be tagged and published
+before the adapters that require it. Adapter releases run a sanitized
+no-replace validation (`scripts/validate-no-replace.sh`) that resolves
+the declared core version from the module proxy or direct VCS — never
+from the local checkout. After each tag is pushed, verify real
+consumption with `scripts/verify-published-consumer.sh`, which builds
+a fresh external module with no replace, workspace, or local path.
+
 ## Licensing
 
 Contributions are accepted under the project's MIT license.

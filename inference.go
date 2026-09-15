@@ -117,7 +117,7 @@ func (in *Instrumenter) StartInference(ctx context.Context, req Request) (contex
 	if req.Streaming {
 		attrs = append(attrs, attribute.Bool(semconv.AttrGenAIRequestStreaming, true))
 	}
-	if convID := ConversationIDFromContext(ctx); convID != "" {
+	if convID, ok := ConversationIDFromContext(ctx); ok && convID != "" {
 		attrs = append(attrs, attribute.String(semconv.AttrGenAIConversationID, convID))
 	}
 

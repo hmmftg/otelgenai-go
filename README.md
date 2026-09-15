@@ -239,7 +239,10 @@ provider that accepts records, and no content without a configured
 | `otelgenai.agent.continued_after_error`       | Repository-owned: agent continued after an observed error (no retry/recovery claim) |
 
 `WithConversationID(ctx, id)` attaches `gen_ai.conversation.id` to spans
-and events; it is never added to metrics. Event timestamps are
+and events; it is never added to metrics. `WithConversationID(ctx, "")`
+explicitly clears/shadows an inherited ID for the returned context;
+`ConversationIDFromContext` returns `(string, bool)` so callers can
+distinguish "absent" from "explicitly cleared". Event timestamps are
 occurrence times, not export times.
 
 ## Pinned convention version

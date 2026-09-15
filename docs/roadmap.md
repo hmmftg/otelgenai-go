@@ -93,7 +93,15 @@ on adoption feedback and upstream semantic-convention evolution.
   `RecordsWithEventName`)
 - Release hardening (findings F1–F6, F10 from technical review):
   - Adapter `go.mod` files require core `v0.6.0`; release workflow
-    validates adapters with `GOWORK=off` against published core
+    validates adapters against the published core through sanitized
+    no-replace module copies (`scripts/validate-no-replace.sh`)
+  - Public diagnostic contract: `Diagnostic`, `DiagnosticReason`,
+    `DiagnosticHandler`, and fixed `DiagnosticReason*` constants
+    exported from core (previously `WithDiagnosticHandler` took an
+    `internal/safety` type unusable by external consumers)
+  - `ConversationIDFromContext` returns `(string, bool)`;
+    `WithConversationID(ctx, "")` explicitly clears/shadows an
+    inherited ID
   - Exported well-known operation/system constants and semantic span
     helpers (`ApplySpanOutcome`, `AugmentToolSpan`); production
     adapter code no longer imports `internal/*`
@@ -105,6 +113,55 @@ on adoption feedback and upstream semantic-convention evolution.
     `govulncheck` on all modules
   - Docs: README compatibility table, `doc.go` example, conventions
     cache-token keys and event attributes
+- Release guards: strict version format, tag absence (local and
+  remote), clean source on `main`, root tag matches `Version`,
+  adapter declared core requirement is a published tag
+- External published-consumer verification
+  (`scripts/verify-published-consumer.sh`)
+
+## v0.7 (planned: reliability and semantic stabilization)
+
+No new telemetry surface. Harden the v0.6 boundaries before v1.0.
+
+- Event exactness: per-event enablement/preflight (inference details,
+  tool details, occurrences checked independently); disabled event
+  types must not trigger projection work; per-event projector
+  error/panic/oversize/invalid-value tests; no raw fallback anywhere
+- Correlation matrix: conversation ID propagation verified across
+  inference/agent/tool/internal spans and events, plus metric
+  exclusion tests
+- ADK continuation state machine: exactly-once
+  `continued_after_error` for error→model and error→tool; nested and
+  sequential child operations; no pending-state leakage between
+  invocations; abandoned-invocation cleanup emits nothing synthetic
+- Bounded diagnostics: classification, dedup/noise policy, disabled
+  instrumentation, handler panic isolation, fixed low-cardinality
+  reasons
+- Projection ceilings: non-bypassable hard limits enforced during
+  traversal/construction (field size, nesting depth, retained event
+  payload, item count); numeric values decided after measurement
+- Streaming lifecycle audit: terminal success/error, cancel, EOF,
+  Close, abandoned stream (caller-owned), partial callbacks,
+  duplicate finalization, no post-finalization metrics; fuzz/property
+  seeds where useful
+- Semantic-convention matrix (documentation-first): classify each
+  field as upstream, repository-owned, or legacy divergence; no broad
+  renames (F9 decision deferred to v1.0)
+- Adapter-family conformance suites (not one universal contract):
+  core conformance + provider-wrapper contracts + MCP-specific +
+  ADK-specific
+- Per-module Go floors validated against the pinned dependency graph
+  (hypothesis: Go 1.25 core/provider/MCP, Go 1.26.6 ADK — validate
+  before changing `go.mod`), CI matrix to match
+- Release reproducibility: dependency-diff checks, tag/version/source
+  consistency, fuzz smoke where practical; SBOM/provenance deferred
+  (source Go modules, not built artifacts)
+
+Explicitly deferred from v0.7: turn/session abstractions,
+retry/recovery inference, automatic fallback detection, conversation
+reconstruction, arbitrary event APIs, generic adapter attribute
+injection, provider-specific telemetry in core, automatic content
+capture, new high-cardinality metrics.
 
 ## v1.0 (planned direction)
 

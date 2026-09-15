@@ -8,9 +8,31 @@ for stable releases. While the major version is `0`, breaking changes may occur
 in minor releases because the GenAI semantic conventions are still in
 development.
 
-## [Unreleased]
+## [0.6.0] - 2026-09-15
 
 ### Added (v0.6 hardening)
+
+- Public diagnostic contract (`diagnostic.go`): `DiagnosticReason`,
+  `Diagnostic`, `DiagnosticHandler`, and fixed `DiagnosticReason*`
+  constants are now exported from the core package, making
+  `WithDiagnosticHandler` usable by external consumers. The public
+  reason constants are distinct from `InstrumentationFailure` — the
+  latter remains the constrained adapter-facing input to
+  `ReportInstrumentationFailure`, while `DiagnosticReason` is the
+  stable observation vocabulary delivered to handlers.
+- Sanitized no-replace release validation
+  (`scripts/validate-no-replace.sh`): copies a module to a temporary
+  directory, strips local `replace` directives, and runs
+  download/tidy/vet/test/build with `GOWORK=off`. Adapter validation
+  therefore resolves the declared core version from the module proxy
+  or direct VCS, never from the checkout.
+- External published-consumer verification
+  (`scripts/verify-published-consumer.sh`): builds an unrelated module
+  with no replace, workspace, or checkout dependency against an actual
+  published tag.
+- Release workflow guards: strict version format, tag absence (local
+  and remote), clean source on `main`, root tag matches `Version`,
+  and adapter declared core requirement is a published tag.
 
 - Exported well-known operation and system constants (`OperationChat`,
   `OperationGenerateContent`, `OperationTextCompletion`,
@@ -35,11 +57,18 @@ development.
   files import `internal/*`.
 - CI: `govulncheck` extended to all six modules.
 - Release: strict version format validation, root tag matches `Version`
-  constant, adapter releases validate with `GOWORK=off` against the
-  published core.
+  constant, tag absence and clean-`main` guards, adapter releases
+  validate against the published core through sanitized no-replace
+  module copies (`scripts/validate-no-replace.sh`).
 
 ### Changed (v0.6 hardening)
 
+- `ConversationIDFromContext` now returns `(string, bool)`. The bool
+  distinguishes an absent ID (false) from an explicitly attached one
+  (true), including an explicitly cleared empty ID.
+- `WithConversationID(ctx, "")` now explicitly clears/shadows an
+  inherited conversation ID (previously it was a no-op). An empty
+  value is stored so a child context cannot re-inherit a cleared ID.
 - All core operation `End` methods (inference, agent, tool, internal)
   now route error classification through the panic-isolated
   `ClassifyError`, removing the unguarded private `classifyError`.
@@ -48,6 +77,9 @@ development.
   and `internal/safety`; test-only imports remain.
 - Default instrumentation scope version changed from `0.1.0` to
   `0.6.0`.
+- `WithDiagnosticHandler` accepts the exported `DiagnosticHandler`
+  type instead of the internal `safety.DiagnosticHandler` (identical
+  behavior; the parameter type is now nameable outside the module).
 
 ### Added (v0.6)
 
@@ -238,4 +270,4 @@ development.
 - Removed `internal/conformancetest` package; replaced by public
   `testutil` package.
 
-[Unreleased]: https://github.com/hmmftg/otelgenai-go/releases
+[0.6.0]: https://github.com/hmmftg/otelgenai-go/releases/tag/v0.6.0

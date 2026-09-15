@@ -99,10 +99,13 @@ func WithErrorClassifier(ec ErrorClassifier) Option {
 }
 
 // WithDiagnosticHandler sets a handler invoked when the library drops
-// a projection or recovers a callback panic. The handler receives only
-// a stage name and low-cardinality reason code, never rejected content
-// or raw errors.
-func WithDiagnosticHandler(h safety.DiagnosticHandler) Option {
+// a projection, recovers a callback panic, or observes an internal
+// instrumentation failure. The handler receives only a bounded
+// [Diagnostic] with a stage name and low-cardinality
+// [DiagnosticReason]; it never receives rejected content, raw errors,
+// or panic values. The handler is the application's policy layer for
+// aggregation, deduplication, and rate limiting.
+func WithDiagnosticHandler(h DiagnosticHandler) Option {
 	return func(c *config) { c.diagnosticHandler = h }
 }
 

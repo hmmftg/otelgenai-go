@@ -14,7 +14,6 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/genai"
@@ -246,8 +245,8 @@ func TestBeforeModelCreatesState(t *testing.T) {
 func TestBeforeModelCollisionPreservesState(t *testing.T) {
 	var diags atomic.Int32
 	p := newTestPlugin(t,
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-			if d.Reason == safety.ReasonModelStateConflict {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+			if d.Reason == otelgenai.DiagnosticReasonModelStateConflict {
 				diags.Add(1)
 			}
 		}),
@@ -357,8 +356,8 @@ func TestOnModelErrorIsObservational(t *testing.T) {
 func TestBeforeToolInvalidSpanFailsClosed(t *testing.T) {
 	var diags atomic.Int32
 	p := newTestPlugin(t,
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-			if d.Reason == safety.ReasonInvalidToolSpan {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+			if d.Reason == otelgenai.DiagnosticReasonInvalidToolSpan {
 				diags.Add(1)
 			}
 		}),
@@ -561,8 +560,8 @@ func TestBeforeToolSystemResolverPanicIsIsolated(t *testing.T) {
 	var diags atomic.Int32
 	exporter := tracetest.NewInMemoryExporter()
 	p, tp := newTestPluginWithTracer(t, exporter,
-		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
-			if d.Reason == safety.ReasonToolSystemResolverPanic {
+		otelgenai.WithDiagnosticHandler(func(d otelgenai.Diagnostic) {
+			if d.Reason == otelgenai.DiagnosticReasonToolSystemResolverPanic {
 				diags.Add(1)
 			}
 		}),
