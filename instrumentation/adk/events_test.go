@@ -266,6 +266,54 @@ func TestToolErrorObserved(t *testing.T) {
 	}
 }
 
+// TestToolErrorContinuation verifies that a pending tool error is consumed
+// by the next beforeTool and emits exactly one continued_after_error with
+// the execute_tool operation, the prior classified error, the session
+// conversation ID, and the callback-entry timestamp.
+func TestToolErrorContinuation(t *testing.T) {
+	rec := testutil.NewRecorder()
+	defer rec.Shutdown(context.Background())
+	p := newEventPlugin(t, rec)
+
+	ctx := newMockCtx("inv1", "root", "agent1").withSession("sess-9")
+	p.beforeAgent(ctx)
+
+	errAt := time.Now().Add(-time.Second).UTC()
+	p.onToolError(ctx, errors.New("tool blew up"), errAt)
+
+	errRecs := rec.RecordsWithEventName("otelgenai.agent.tool.error_observed")
+	if len(errRecs) != 1 {
+		t.Fatalf("error_observed events = %d, want 1", len(errRecs))
+	}
+
+	// The next tool call emits continued_after_error at callback-entry time.
+	tracer := rec.TracerProvider().Tracer("test")
+	_, span := tracer.Start(ctx, "execute_tool next_tool")
+	mockWithSpan := ctx.withSpan(span)
+
+	contAt := time.Now().UTC()
+	p.beforeTool(mockWithSpan, &mockTool{name: "next_tool"}, nil, contAt)
+
+	contRecs := rec.RecordsWithEventName("otelgenai.agent.continued_after_error")
+	if len(contRecs) != 1 {
+		t.Fatalf("continued_after_error events = %d, want 1", len(contRecs))
+	}
+	if !contRecs[0].Timestamp().Equal(contAt) {
+		t.Errorf("continuation timestamp = %v, want %v", contRecs[0].Timestamp(), contAt)
+	}
+	attrs := eventAttrs(t, contRecs[0])
+	if got := attrs["gen_ai.operation.name"].AsString(); got != "execute_tool" {
+		t.Errorf("operation.name = %q", got)
+	}
+	if got := attrs["error.type"].AsString(); got != "unknown" {
+		t.Errorf("error.type = %q, want classified prior error", got)
+	}
+	if got := attrs["gen_ai.conversation.id"].AsString(); got != "sess-9" {
+		t.Errorf("conversation.id = %q", got)
+	}
+	span.End()
+}
+
 func TestNoEventsWithoutContentProjector(t *testing.T) {
 	rec := testutil.NewRecorder()
 	defer rec.Shutdown(context.Background())

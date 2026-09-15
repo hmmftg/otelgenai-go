@@ -11,8 +11,8 @@ input for v0.6/v0.7 planning; findings are ordered by severity.
 | v0.2 (generic helpers, testutil, WithSystem, google-genai) | Implemented |
 | v0.3 (MCP adapter, InternalOperation, StreamState hardening) | Implemented |
 | v0.4 (pricing resolver, cost attribute, cardinality testutil) | Implemented |
-| v0.5 (ADK plugin, exported adapter APIs) | Implemented, pending release |
-| v0.6 (correlated events, conversation ID, ProjectedContent) | In progress (uncommitted) |
+| v0.5 (ADK plugin, exported adapter APIs) | Implemented |
+| v0.6 (correlated events, conversation ID, ProjectedContent) | Implemented; release hardening |
 | v1.0 (stable contracts, public semconv, LTS) | Planned |
 
 ## Design properties to preserve
@@ -50,102 +50,78 @@ These are deliberate decisions; regressions here are defects, not style issues.
 
 ### F1 — Critical: adapter modules declare the wrong core version
 
-Every `instrumentation/*/go.mod` requires `github.com/hmmftg/otelgenai-go
-v0.1.0` and resolves it via `replace => ../..`. Replace directives in
-dependency modules do not propagate to consumers, so published adapter tags
-will compile against core v0.1.0, which lacks:
+**Resolved.** All adapter `go.mod` files now require core `v0.6.0`.
+The release workflow validates adapter releases with `GOWORK=off`
+against the published core. Local `replace` directives remain for
+development until the core tag is published; the release workflow's
+adapter path performs the no-replace consumer check.
 
-- `StartInternalOperation` (used by MCP, added v0.3)
-- `ClassifyError`, `Record*`, `ReportInstrumentationFailure` (used by ADK, v0.5)
-- `ProjectContent`, `Emit*`, `WithConversationID` (used by ADK, v0.6)
+Original finding: every `instrumentation/*/go.mod` required
+`github.com/hmmftg/otelgenai-go v0.1.0` and resolved it via
+`replace => ../..`. Replace directives in dependency modules do not
+propagate to consumers, so published adapter tags would compile
+against core v0.1.0, which lacks post-v0.1 APIs.
 
-The downstream consumer tests do not catch this because they `replace` both
-the core and the adapter to local paths (`test/downstream/*/go.mod`).
+### F2 — High: adapter imports of core internal packages
 
-**Action:** before tagging, bump each adapter's `require` to the next core
-version; establish release order (core first, then adapters); add one
-no-replace consumer test that resolves versions from the proxy (e.g. in the
-release workflow against a staged tag, or via `go mod download` checks).
+**Resolved.** All production adapter code (openai, anthropic,
+google-genai, adk) no longer imports `internal/semconv` or
+`internal/safety`. Well-known operation/system constants are exported
+from the core package. The ADK adapter uses a local `guardedCall`
+helper and the `ApplySpanOutcome` / `AugmentToolSpan` semantic APIs.
+Test-only imports of `internal/*` remain. CI enforces the boundary
+with a dedicated check.
 
-### F2 — High: ADK adapter now imports core internal packages
-
-`instrumentation/adk/tool.go` and `inference.go` import
-`internal/semconv` and `internal/safety`. Legal (shared module-path prefix),
-but it couples a separately versioned module to core internals: any internal
-refactor silently breaks the published adapter, and it bypasses the
-constrained adapter API boundary created in v0.5.
-
-**Action:** decide the policy explicitly. Either (a) export what adapters
-need through the adapter API (preferred — e.g. a guarded-call helper and a
-tool-attribute setter like `SetToolSpanAttributes`), or (b) accept internal
-imports and version-lock adapter releases to exact core versions.
+Original finding: `instrumentation/adk/tool.go` and `inference.go`
+imported `internal/semconv` and `internal/safety`, coupling a
+separately versioned module to core internals. The issue also
+affected `openai`, `anthropic`, and `google-genai` mapping files.
 
 ### F3 — Medium: instrumentation scope version is hardcoded `0.1.0`
 
-`defaultInstrumentationVersion` in `option.go` still reports 0.1.0 for all
-releases unless users set `WithInstrumentationVersion`. Telemetry scope
-metadata will mislead compatibility debugging.
-
-**Action:** stamp the version at release (linker flag or generated
-`version.go`), or bump the constant per release as a required checklist item.
+**Resolved.** A `Version` constant (`"0.6.0"`) is exported and used as
+the default instrumentation scope version for traces, metrics, and
+logs. The release workflow validates that a root release tag matches
+`v${Version}` before tagging.
 
 ### F4 — Medium: unguarded error classifier in core paths
 
-`Instrumenter.classifyError` calls `in.classifier(err)` directly; it is used
-by `InferenceOperation.End`, `AgentOperation.End`, `ToolOperation.End`, and
-`InternalOperation.End`. A panicking user classifier crashes the app on the
-hot path — contradicting the safety package contract. The public
-`ClassifyError` (v0.5) is guarded; the private path is not.
-
-**Action:** route all internal call sites through the guarded implementation
-(single source of truth), keeping `ErrorTypeNone → ErrorTypeUnknown`
-normalization.
+**Resolved.** All core operation `End` methods (inference, agent,
+tool, internal) now route through the panic-isolated `ClassifyError`.
+The unguarded private `classifyError` has been removed. A panicking
+classifier reports a `classifier.panic` diagnostic and sets
+`error.type=unknown` without crashing `End`.
 
 ### F5 — Medium: CI coverage gaps
 
-- Root `go build ./... && go test ./...` does not cover nested modules; only
-  the Ubuntu race job tests each adapter. Adapter tests never run on Windows.
-- `govulncheck` covers root, openai, anthropic only — not google-genai, mcp,
-  or adk.
-- Downstream builds use `replace` for both core and adapter (see F1).
-
-**Action:** run per-module test/build on both OS matrix legs; extend
-govulncheck to all modules; add the no-replace consumer check from F1.
+**Resolved.** CI now uses an OS × module matrix (Linux + Windows,
+all six modules) for vet/build/test. `govulncheck` is extended to
+all six modules. An internal-import boundary check fails when
+non-test adapter files import `internal/*`.
 
 ### F6 — Medium: documentation drift
 
-- `docs/roadmap.md` labels both v0.4 and v0.5 "(current)".
-- README compatibility table omits the MCP and ADK modules.
-- `doc.go` example references `otelgenai.OperationChat`, but operation
-  constants live in `internal/semconv` — the snippet does not compile as
-  written.
-- `docs/conventions.md` documents `gen_ai.usage.cache_read_tokens`; the
-  implementation emits `gen_ai.usage.cache_read_input_tokens` /
-  `..._write_input_tokens` (span names) and event-only
-  `cache_read.input_tokens` / `reasoning.output_tokens` variants.
-- README claims the core depends only on OTel API packages; the root module
-  now also carries `otel/sdk/log` for `testutil`. Update the claim or split
-  testutil into its own module.
+**Resolved.** README compatibility table now includes MCP and ADK
+rows. `doc.go` uses the exported `OperationChat` constant.
+`docs/conventions.md` documents correct cache-token keys
+(`cache_read_input_tokens`, `cache_write_input_tokens`), event-only
+attributes, conversation ID, and repository-owned event names.
 
-**Action:** single docs-consistency pass in the release checklist.
+Original finding: roadmap labelled v0.4/v0.5 "(current)", README
+omitted MCP/ADK, `doc.go` referenced an internal constant, and
+conventions documented incorrect cache-token keys.
 
 ### F7 — Low: lost metric exemplar context in ADK agent/tool paths
 
-`adk/agent.go` (`afterAgent`) and `adk/tool.go` (`afterTool`) record metrics
-with `context.Background()`; `adk/inference.go` now passes `ctx`. Metrics
-recorded on Background lose trace-context exemplar links.
-
-**Action:** prefer the callback context (or stored span context) for all
-metric recording where one is available.
+**Resolved** (commit `00bb1f0`). ADK agent and tool metric
+recordings now use the callback context instead of
+`context.Background()`, preserving trace-context exemplar links.
 
 ### F8 — Low: `continued_after_error` only fires before model calls
 
-`registry.takePendingError` is consumed in `beforeModel` only. The occurrence
-contract says "a subsequent model or tool call"; `beforeTool` does not check
-the pending error, so error → tool-call sequences never produce the event.
-
-**Action:** either consume `pendingError` in `beforeTool` too, or narrow the
-documented semantics to "subsequent model call".
+**Resolved** (commit `dd1f1e0`). `beforeTool` now consumes pending
+errors and emits `continued_after_error` before subsequent tool calls,
+matching the documented "subsequent model or tool call" semantics.
 
 ### F9 — Low: span vs event attribute naming divergence needs a v1.0 decision
 
@@ -157,10 +133,10 @@ dual-emission decision is required before v1.0 stabilizes the contract.
 
 ### F10 — Low: `gen_ai.conversation.id` missing on `StartInternalOperation` spans
 
-Conversation correlation was added to inference, agent, and tool spans.
-`InternalOperation` (used by MCP `resources/read`/`prompts/get`) does not
-carry it. If conversation correlation is part of the v0.6 contract, add it
-there or document the exclusion.
+**Resolved.** `StartInternalOperation` now attaches
+`gen_ai.conversation.id` from context when present, matching
+inference, agent, and tool spans. The caller-supplied attributes
+slice is not mutated.
 
 ### F11 — Info: `go 1.27` floor restricts adoption
 
@@ -188,7 +164,9 @@ Checklist distilled from the findings; apply to every new feature/adapter:
       upstream-standard events; everything else `otelgenai.*`).
 - [ ] Adapters report instrumentation failures via the bounded enum, not
       error strings.
-- [ ] Adapters do not import `internal/*` until F2's policy decision is made.
+- [ ] Adapters do not import `internal/*` in production code (F2 policy:
+      export what adapters need through the public API; CI enforces the
+      boundary).
 - [ ] Convention name changes go through `internal/semconv` only; document
       span/event divergences in `docs/conventions.md`.
 - [ ] Update README compatibility table and CHANGELOG in the same PR as any

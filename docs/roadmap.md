@@ -67,7 +67,7 @@ on adoption feedback and upstream semantic-convention evolution.
   - Semantic-argument API (not arbitrary `attribute.KeyValue`)
   - Existing metric semantics preserved
 
-## v0.6 (implemented)
+## v0.6 (implemented; release hardening)
 
 - Correlated events via the OTel Logs API (`WithLoggerProvider`,
   `EventsEnabled`, `ContentEventsEnabled` preflights)
@@ -91,27 +91,20 @@ on adoption feedback and upstream semantic-convention evolution.
   pending-error tracking for `continued_after_error`
 - `testutil` log recorder (`LoggerProvider`, `Records`,
   `RecordsWithEventName`)
-
-## v0.7 (release hardening — candidate)
-
-Scope derived from `docs/technical-review.md` (findings F1–F11):
-
-- Fix adapter `go.mod` core-version requirements; define release order
-  (core first, adapters second) and add a no-replace consumer check
-- Decide and enforce the policy on adapters importing core `internal/*`
-  packages (export through the adapter API, or version-lock releases)
-- Stamp the instrumentation scope version per release (replaces the
-  hardcoded `0.1.0`)
-- Route all core error-classifier call sites through the guarded
-  implementation (parity with public `ClassifyError`)
-- Close CI gaps: per-module tests on the Windows leg, `govulncheck`
-  across all modules
-- Docs-consistency pass: README compatibility table (MCP, ADK, log
-  dependency), `doc.go` compilable example, `conventions.md`
-  cache-token key names
-- ADK polish: conversation ID on `StartInternalOperation` spans
-  (exemplar-preserving metric contexts and `continued_after_error` for
-  tool calls landed in v0.6)
+- Release hardening (findings F1–F6, F10 from technical review):
+  - Adapter `go.mod` files require core `v0.6.0`; release workflow
+    validates adapters with `GOWORK=off` against published core
+  - Exported well-known operation/system constants and semantic span
+    helpers (`ApplySpanOutcome`, `AugmentToolSpan`); production
+    adapter code no longer imports `internal/*`
+  - `Version` constant (`0.6.0`) as default instrumentation scope
+    version
+  - All core `End` methods route through panic-isolated `ClassifyError`
+  - `gen_ai.conversation.id` on `StartInternalOperation` spans
+  - CI: OS × module test matrix, internal-import boundary check,
+    `govulncheck` on all modules
+  - Docs: README compatibility table, `doc.go` example, conventions
+    cache-token keys and event attributes
 
 ## v1.0 (planned direction)
 
