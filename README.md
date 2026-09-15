@@ -260,6 +260,8 @@ reviewed changes.
 | `instrumentation/openai`        | 1.27   | v1.46.0 | openai-go v1.12.0     |
 | `instrumentation/anthropic`     | 1.27   | v1.46.0 | anthropic-sdk-go v1.72.0 |
 | `instrumentation/google-genai`  | 1.27   | v1.46.0 | google.golang.org/genai v1.71.0 |
+| `instrumentation/mcp`           | 1.27   | v1.46.0 | modelcontextprotocol/go-sdk v1.7.0 |
+| `instrumentation/adk`           | 1.27   | v1.46.0 | google.golang.org/adk/v2 v2.3.0 |
 
 ## Stream-close responsibility
 

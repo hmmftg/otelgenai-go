@@ -2,6 +2,59 @@
 
 This document describes how to migrate between versions of otelgenai-go.
 
+## Migrating to v0.6
+
+v0.6 adds correlated OTel Logs API events, conversation correlation,
+projected content, structured messages, and ADK event integration. It
+also hardens release engineering and removes production adapter
+dependencies on core internals.
+
+### New features
+
+- **Correlated events** via the OTel Logs API:
+  - `WithLoggerProvider` option for explicit logger provider.
+  - `WithConversationID` / `ConversationIDFromContext` for conversation
+    correlation on spans and events (never on metrics).
+  - `ProjectedContent` opaque bounded projection via
+    `Instrumenter.ProjectContent`.
+  - `EmitInferenceDetails`, `EmitToolDetails`, `EmitAgentOccurrence`
+    for standard and repository-owned events.
+  - `Message.Parts` / `MessagePart` / `SystemInstructionParts`
+    structured canonical content.
+- **Well-known constants**: `OperationChat`, `OperationGenerateContent`,
+  `OperationTextCompletion`, `OperationEmbeddings`,
+  `OperationInvokeAgent`, `OperationExecuteTool`, `SystemOpenAI`,
+  `SystemAnthropic` exported from the core package.
+- **Semantic span helpers**: `ApplySpanOutcome(ctx, err)` and
+  `AugmentToolSpan(ctx, ToolSpanAttributes)` for framework adapters
+  that need to decorate framework-owned spans without raw span
+  mutation.
+- **Version constant**: `otelgenai.Version` (`"0.6.0"`) used as the
+  default instrumentation scope version.
+- **InternalOperation conversation ID**: `gen_ai.conversation.id` is
+  now attached to internal operation spans when present in context.
+
+### Changed behavior
+
+- All core operation `End` methods now use the panic-isolated
+  `ClassifyError`. A panicking classifier no longer crashes `End`; it
+  reports a `classifier.panic` diagnostic and sets `error.type=unknown`.
+- The default instrumentation scope version is now `0.6.0` (was
+  `0.1.0`). Override with `WithInstrumentationVersion` if needed.
+- All adapter `go.mod` files now require core `v0.6.0`.
+- All production adapter code no longer imports `internal/semconv` or
+  `internal/safety`. Test-only imports remain.
+
+### Privacy
+
+All v0.6 additions preserve the safe-by-default contract:
+- No prompts, responses, tool arguments, or results without a
+  configured `ContentProjector`.
+- No credentials, cookies, or raw bodies.
+- No raw error messages in telemetry.
+- Conversation IDs never appear on metrics.
+- Event names are static; no dynamic values in event names.
+
 ## Migrating to v0.5
 
 v0.5 adds the Google ADK Go framework integration and exported

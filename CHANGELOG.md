@@ -10,6 +10,45 @@ development.
 
 ## [Unreleased]
 
+### Added (v0.6 hardening)
+
+- Exported well-known operation and system constants (`OperationChat`,
+  `OperationGenerateContent`, `OperationTextCompletion`,
+  `OperationEmbeddings`, `OperationInvokeAgent`, `OperationExecuteTool`,
+  `SystemOpenAI`, `SystemAnthropic`) so adapters no longer import
+  `internal/semconv` for these values.
+- `Instrumenter.ApplySpanOutcome(ctx, err)`: context-based semantic
+  helper that classifies an error and applies `error.type` and status
+  to the active span. Replaces raw `trace.Span` mutation in adapters.
+- `Instrumenter.AugmentToolSpan(ctx, ToolSpanAttributes)`: context-based
+  semantic helper that applies `gen_ai.tool.type` (default `function`)
+  and `gen_ai.system` to the active execute_tool span.
+- `Version` constant (`0.6.0`) used as the default instrumentation
+  scope version for traces, metrics, and logs.
+- `gen_ai.conversation.id` is now attached to `InternalOperation`
+  spans when present in context, matching inference, agent, and tool
+  spans.
+- ADK-local `guardedCall` panic-isolation helper so the ADK adapter
+  does not depend on `internal/safety`.
+- CI: OS × module test matrix (Linux + Windows, all six modules).
+- CI: internal-import boundary check that fails when non-test adapter
+  files import `internal/*`.
+- CI: `govulncheck` extended to all six modules.
+- Release: strict version format validation, root tag matches `Version`
+  constant, adapter releases validate with `GOWORK=off` against the
+  published core.
+
+### Changed (v0.6 hardening)
+
+- All core operation `End` methods (inference, agent, tool, internal)
+  now route error classification through the panic-isolated
+  `ClassifyError`, removing the unguarded private `classifyError`.
+- All adapter `go.mod` files now require core `v0.6.0`.
+- All production adapter code removed imports of `internal/semconv`
+  and `internal/safety`; test-only imports remain.
+- Default instrumentation scope version changed from `0.1.0` to
+  `0.6.0`.
+
 ### Added (v0.6)
 
 - Correlated OTel log-based events through the Logs API

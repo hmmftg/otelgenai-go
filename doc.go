@@ -16,7 +16,7 @@
 //	if err != nil { ... }
 //
 //	ctx, op := instr.StartInference(ctx, otelgenai.Request{
-//	    Operation: otelgenai.Operation(otelgenai.OperationChat),
+//	    Operation: otelgenai.OperationChat,
 //	    Provider: "openai",
 //	    Model:    "gpt-4o",
 //	})

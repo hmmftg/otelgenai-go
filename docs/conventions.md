@@ -40,7 +40,8 @@ the convention contract.
 |-----------|-----|
 | Input tokens | `gen_ai.usage.input_tokens` |
 | Output tokens | `gen_ai.usage.output_tokens` |
-| Cache read tokens | `gen_ai.usage.cache_read_tokens` |
+| Cache read tokens | `gen_ai.usage.cache_read_input_tokens` |
+| Cache write tokens | `gen_ai.usage.cache_write_input_tokens` |
 | Reasoning tokens | `gen_ai.usage.reasoning_tokens` |
 
 ### Cost attributes (repository-defined extension)
@@ -100,7 +101,35 @@ conventions are still evolving.
 
 `InternalOperation` spans are generic INTERNAL spans with no
 provider-specific or MCP-specific knowledge. They carry only the
-supplied attributes plus `error.type` on failure.
+supplied attributes plus `error.type` on failure. When a conversation
+ID is present in the context (via `WithConversationID`), it is
+attached as `gen_ai.conversation.id`.
+
+### Correlation attributes
+
+| Attribute | Key | Scope | Description |
+|-----------|-----|-------|-------------|
+| Conversation ID | `gen_ai.conversation.id` | traces, events | Canonical conversation/session identifier. Never added to metrics. |
+
+The conversation ID is attached to spans via `WithConversationID` and
+read from context by `StartInference`, `StartAgent`, `StartTool`, and
+`StartInternalOperation`. It is also carried on correlated events. It
+is never added to metrics to avoid high-cardinality time series.
+
+### Event-only attributes
+
+Correlated events (OTel Logs API) use some attribute names that differ
+from the pinned span conventions. This divergence follows the current
+upstream GenAI event schema and is documented as a v1.0 decision (see
+Finding F9 in `docs/technical-review.md`).
+
+| Attribute | Key | Notes |
+|-----------|-----|-------|
+| Provider name | `gen_ai.provider.name` | Event-only; spans use `gen_ai.system`. |
+| Request stream | `gen_ai.request.stream` | Event-only; spans use `gen_ai.request.streaming`. |
+| Cache read tokens | `gen_ai.usage.cache_read.input_tokens` | Event-only dotted form. |
+| Cache write tokens | `gen_ai.usage.cache_write.input_tokens` | Event-only dotted form. |
+| Reasoning tokens | `gen_ai.usage.reasoning.output_tokens` | Event-only dotted form. |
 
 ### Opt-in content attributes (disabled by default)
 
@@ -167,6 +196,22 @@ For MCP `resources/read` and `prompts/get`, the span name is the MCP
 method name only (no URI or prompt name in the span name). Resource
 URIs and prompt names are carried as attributes (`mcp.resource.uri`
 and `gen_ai.prompt.name` respectively).
+
+## Event names
+
+Correlated events use static, event-specific names. Dynamic identity
+belongs in attributes, never in event names.
+
+| Event name | Scope | Description |
+|------------|-------|-------------|
+| `gen_ai.client.inference.operation.details` | Upstream standard | Opt-in inference operation details. |
+| `otelgenai.execute_tool.operation.details` | Repository-owned | Tool execution details. |
+| `otelgenai.agent.model.error_observed` | Repository-owned | Agent observed a model error. |
+| `otelgenai.agent.tool.error_observed` | Repository-owned | Agent observed a tool error. |
+| `otelgenai.agent.continued_after_error` | Repository-owned | Agent continued after a prior error. |
+
+Repository-owned events use the `otelgenai.*` namespace to distinguish
+them from upstream-standard events. These names are stable within v0.x.
 
 ## Metrics
 
