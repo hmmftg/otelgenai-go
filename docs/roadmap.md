@@ -67,7 +67,7 @@ on adoption feedback and upstream semantic-convention evolution.
   - Semantic-argument API (not arbitrary `attribute.KeyValue`)
   - Existing metric semantics preserved
 
-## v0.6 (in progress)
+## v0.6 (implemented)
 
 - Correlated events via the OTel Logs API (`WithLoggerProvider`,
   `EventsEnabled`, `ContentEventsEnabled` preflights)
@@ -109,9 +109,9 @@ Scope derived from `docs/technical-review.md` (findings F1–F11):
 - Docs-consistency pass: README compatibility table (MCP, ADK, log
   dependency), `doc.go` compilable example, `conventions.md`
   cache-token key names
-- ADK polish: exemplar-preserving metric contexts, `continued_after_error`
-  coverage for tool calls (or narrowed contract), conversation ID on
-  `StartInternalOperation` spans
+- ADK polish: conversation ID on `StartInternalOperation` spans
+  (exemplar-preserving metric contexts and `continued_after_error` for
+  tool calls landed in v0.6)
 
 ## v1.0 (planned direction)
 

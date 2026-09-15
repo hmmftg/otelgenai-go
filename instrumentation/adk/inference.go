@@ -116,15 +116,15 @@ func (p *Plugin) afterModel(ctx callbackContext, resp *model.LLMResponse, llmRes
 		return
 	}
 	details := otelgenai.InferenceDetails{
-		Operation:           otelgenai.Operation("generate_content"),
-		Provider:            termSt.provider,
-		RequestModel:        termSt.model,
-		ConversationID:      ctx.SessionID(),
-		Streaming:           termSt.streaming,
-		Usage:               termSt.usage,
-		SystemInstructions:  termSt.systemInstructions,
-		InputMessages:       termSt.inputMessages,
-		OccurredAt:          occurredAt,
+		Operation:          otelgenai.Operation("generate_content"),
+		Provider:           termSt.provider,
+		RequestModel:       termSt.model,
+		ConversationID:     ctx.SessionID(),
+		Streaming:          termSt.streaming,
+		Usage:              termSt.usage,
+		SystemInstructions: termSt.systemInstructions,
+		InputMessages:      termSt.inputMessages,
+		OccurredAt:         occurredAt,
 	}
 	if resp != nil {
 		details.ResponseModel = resp.ModelVersion
