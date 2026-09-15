@@ -4,6 +4,7 @@ import (
 	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/pricing"
 	"go.opentelemetry.io/otel"
+	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -14,6 +15,8 @@ type Option func(*config)
 type config struct {
 	tracerProvider         trace.TracerProvider
 	meterProvider          metric.MeterProvider
+	loggerProvider         otellog.LoggerProvider
+	loggerProviderSet      bool
 	instrumentationName    string
 	instrumentationVersion string
 	contentProjector       ContentProjector
@@ -54,6 +57,17 @@ func WithTracerProvider(tp trace.TracerProvider) Option {
 // otel.GetMeterProvider().
 func WithMeterProvider(mp metric.MeterProvider) Option {
 	return func(c *config) { c.meterProvider = mp }
+}
+
+// WithLoggerProvider sets the logger provider used for correlated events.
+// When unset, the global LoggerProvider is resolved at Instrumenter
+// construction time; a global no-op provider means no events are emitted.
+// An explicitly nil provider is invalid and rejected by NewInstrumenter.
+func WithLoggerProvider(lp otellog.LoggerProvider) Option {
+	return func(c *config) {
+		c.loggerProvider = lp
+		c.loggerProviderSet = true
+	}
 }
 
 // WithInstrumentationVersion sets the instrumentation version reported

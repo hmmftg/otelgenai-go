@@ -103,6 +103,9 @@ func (in *Instrumenter) StartAgent(ctx context.Context, req AgentRequest) (conte
 	if req.Model != "" {
 		attrs = append(attrs, attribute.String(semconv.AttrGenAIRequestModel, req.Model))
 	}
+	if convID := ConversationIDFromContext(ctx); convID != "" {
+		attrs = append(attrs, attribute.String(semconv.AttrGenAIConversationID, convID))
+	}
 
 	ctx, span := in.tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindInternal),

@@ -2,8 +2,11 @@ package testutil
 
 import (
 	"context"
+	"sync"
 
+	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -26,6 +29,34 @@ type Recorder struct {
 	tracerProvider *sdktrace.TracerProvider
 	metricReader   *sdkmetric.ManualReader
 	meterProvider  *sdkmetric.MeterProvider
+	logExporter    *inMemoryLogExporter
+	loggerProvider *sdklog.LoggerProvider
+}
+
+// inMemoryLogExporter stores exported log records in memory.
+type inMemoryLogExporter struct {
+	mu      sync.Mutex
+	records []sdklog.Record
+}
+
+func (e *inMemoryLogExporter) Export(_ context.Context, records []sdklog.Record) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i := range records {
+		e.records = append(e.records, records[i].Clone())
+	}
+	return nil
+}
+
+func (e *inMemoryLogExporter) Shutdown(context.Context) error   { return nil }
+func (e *inMemoryLogExporter) ForceFlush(context.Context) error { return nil }
+
+func (e *inMemoryLogExporter) Records() []sdklog.Record {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := make([]sdklog.Record, len(e.records))
+	copy(out, e.records)
+	return out
 }
 
 // NewRecorder creates a Recorder with an in-memory span exporter and
@@ -40,11 +71,17 @@ func NewRecorder() *Recorder {
 	meterProvider := sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(metricReader),
 	)
+	logExporter := &inMemoryLogExporter{}
+	loggerProvider := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewSimpleProcessor(logExporter)),
+	)
 	return &Recorder{
 		spanExporter:   spanExporter,
 		tracerProvider: tracerProvider,
 		metricReader:   metricReader,
 		meterProvider:  meterProvider,
+		logExporter:    logExporter,
+		loggerProvider: loggerProvider,
 	}
 }
 
@@ -58,6 +95,30 @@ func (r *Recorder) TracerProvider() oteltrace.TracerProvider {
 // metric reader.
 func (r *Recorder) MeterProvider() metric.MeterProvider {
 	return r.meterProvider
+}
+
+// LoggerProvider returns the SDK logger provider backed by the
+// in-memory log exporter.
+func (r *Recorder) LoggerProvider() otellog.LoggerProvider {
+	return r.loggerProvider
+}
+
+// Records returns snapshots of all recorded log records in export
+// order.
+func (r *Recorder) Records() []sdklog.Record {
+	return r.logExporter.Records()
+}
+
+// RecordsWithEventName returns recorded log records carrying the given
+// event name.
+func (r *Recorder) RecordsWithEventName(name string) []sdklog.Record {
+	var out []sdklog.Record
+	for _, rec := range r.Records() {
+		if rec.EventName() == name {
+			out = append(out, rec)
+		}
+	}
+	return out
 }
 
 // Spans returns immutable snapshots of all recorded spans in the order
@@ -91,6 +152,9 @@ func (r *Recorder) Shutdown(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 	if err := r.meterProvider.Shutdown(ctx); err != nil {
+		errs = append(errs, err)
+	}
+	if err := r.loggerProvider.Shutdown(ctx); err != nil {
 		errs = append(errs, err)
 	}
 	for _, e := range errs {

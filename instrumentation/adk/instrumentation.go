@@ -3,6 +3,7 @@ package adk
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/model"
@@ -25,6 +26,8 @@ type Option func(*config)
 type config struct {
 	system             string
 	toolSystemResolver ToolSystemResolver
+	provider           string
+	providerResolver   InferenceProviderResolver
 }
 
 // ToolSystemResolver maps an ADK tool to a gen_ai.system value for the
@@ -33,10 +36,18 @@ type config struct {
 // attribute is omitted and a diagnostic is reported.
 type ToolSystemResolver func(toolNameProvider) string
 
+// InferenceProviderResolver maps a request model name to a
+// gen_ai.provider.name value for the standard inference-details event.
+// The resolver runs only when content-bearing events are enabled.
+// Resolver panics are recovered; the event is not emitted and a
+// diagnostic is reported.
+type InferenceProviderResolver func(modelName string) string
+
 // WithSystem sets the gen_ai.system value used for inference metric
 // dimensions. Defaults to "adk" when not specified. This value
 // identifies the AI system/provider for metric attribution and must
-// not be inferred from model names or tool descriptions.
+// not be inferred from model names or tool descriptions. It is not
+// used as gen_ai.provider.name; use WithInferenceProvider for that.
 func WithSystem(system string) Option {
 	return func(c *config) { c.system = system }
 }
@@ -50,6 +61,23 @@ func WithToolSystemResolver(fn ToolSystemResolver) Option {
 	return func(c *config) { c.toolSystemResolver = fn }
 }
 
+// WithInferenceProvider sets the gen_ai.provider.name reported on the
+// standard gen_ai.client.inference.operation.details event. The
+// upstream event schema requires a provider name; without one (or a
+// resolver) the event is not emitted. ADK is a framework, not a
+// provider, so this value is never inferred.
+func WithInferenceProvider(provider string) Option {
+	return func(c *config) { c.provider = provider }
+}
+
+// WithInferenceProviderResolver sets a resolver that maps a request
+// model name to a gen_ai.provider.name value. When both a resolver and
+// a static provider are configured, a non-empty resolver result takes
+// precedence; an empty resolver result falls back to the static value.
+func WithInferenceProviderResolver(fn InferenceProviderResolver) Option {
+	return func(c *config) { c.providerResolver = fn }
+}
+
 // Plugin holds the adapter state and is the receiver for all ADK
 // callback methods. It is distinct from the ADK plugin.Plugin returned
 // by New.
@@ -58,6 +86,8 @@ type Plugin struct {
 	registry           *registry
 	system             string
 	toolSystemResolver ToolSystemResolver
+	provider           string
+	providerResolver   InferenceProviderResolver
 }
 
 // New creates an ADK plugin that instruments agent, model, and tool
@@ -82,6 +112,8 @@ func New(instr *otelgenai.Instrumenter, opts ...Option) (*plugin.Plugin, error) 
 		registry:           newRegistry(),
 		system:             cfg.system,
 		toolSystemResolver: cfg.toolSystemResolver,
+		provider:           cfg.provider,
+		providerResolver:   cfg.providerResolver,
 	}
 
 	return plugin.New(plugin.Config{
@@ -115,54 +147,51 @@ func (p *Plugin) afterAgentCallback(ctx agent.Context) (*genai.Content, error) {
 }
 
 // beforeModelCallback adapts the ADK BeforeModelCallback signature.
-// Returns (nil, nil).
+// The occurrence time is captured at callback entry, before any
+// normalization or projection work. Returns (nil, nil).
 func (p *Plugin) beforeModelCallback(ctx agent.Context, req *model.LLMRequest) (*model.LLMResponse, error) {
-	modelName := ""
-	if req != nil {
-		modelName = req.Model
-	}
-	p.beforeModel(ctx, modelName)
+	occurredAt := time.Now()
+	p.beforeModel(ctx, req, occurredAt)
 	return nil, nil
 }
 
 // afterModelCallback adapts the ADK AfterModelCallback signature.
-// Returns (nil, nil).
+// The occurrence time is captured at callback entry. Returns (nil, nil).
 func (p *Plugin) afterModelCallback(ctx agent.Context, llmResponse *model.LLMResponse, llmResponseError error) (*model.LLMResponse, error) {
-	var usage *genai.GenerateContentResponseUsageMetadata
-	partial := false
-	if llmResponse != nil {
-		usage = llmResponse.UsageMetadata
-		partial = llmResponse.Partial
-	}
-	p.afterModel(ctx, usage, partial, llmResponseError)
+	occurredAt := time.Now()
+	p.afterModel(ctx, llmResponse, llmResponseError, occurredAt)
 	return nil, nil
 }
 
 // onModelErrorCallback adapts the ADK OnModelErrorCallback signature.
-// Returns (nil, nil).
+// The occurrence time is captured at callback entry. Returns (nil, nil).
 func (p *Plugin) onModelErrorCallback(ctx agent.Context, req *model.LLMRequest, err error) (*model.LLMResponse, error) {
-	p.onModelError()
+	occurredAt := time.Now()
+	p.onModelError(ctx, err, occurredAt)
 	return nil, nil
 }
 
 // beforeToolCallback adapts the ADK BeforeToolCallback signature.
-// Returns (nil, nil).
+// The occurrence time is captured at callback entry. Returns (nil, nil).
 func (p *Plugin) beforeToolCallback(ctx agent.Context, t tool.Tool, args map[string]any) (map[string]any, error) {
-	p.beforeTool(ctx, t)
+	occurredAt := time.Now()
+	p.beforeTool(ctx, t, args, occurredAt)
 	return nil, nil
 }
 
 // afterToolCallback adapts the ADK AfterToolCallback signature.
-// Returns (nil, nil).
+// The occurrence time is captured at callback entry. Returns (nil, nil).
 func (p *Plugin) afterToolCallback(ctx agent.Context, t tool.Tool, args, result map[string]any, err error) (map[string]any, error) {
-	p.afterTool(ctx, err)
+	occurredAt := time.Now()
+	p.afterTool(ctx, result, err, occurredAt)
 	return nil, nil
 }
 
 // onToolErrorCallback adapts the ADK OnToolErrorCallback signature.
-// Returns (nil, nil).
+// The occurrence time is captured at callback entry. Returns (nil, nil).
 func (p *Plugin) onToolErrorCallback(ctx agent.Context, t tool.Tool, args map[string]any, err error) (map[string]any, error) {
-	p.onToolError()
+	occurredAt := time.Now()
+	p.onToolError(ctx, err, occurredAt)
 	return nil, nil
 }
 

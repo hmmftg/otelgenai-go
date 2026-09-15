@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	otellog "go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -21,6 +23,7 @@ import (
 // captured unless an explicit ContentProjector is configured.
 type Instrumenter struct {
 	tracer     trace.Tracer
+	logger     otellog.Logger
 	metrics    metrics
 	cfg        config
 	classifier ErrorClassifier
@@ -43,10 +46,23 @@ func New(opts ...Option) (*Instrumenter, error) {
 	if cfg.projectionLimit <= 0 {
 		return nil, errors.New("otelgenai: projection limit must be positive")
 	}
+	if cfg.loggerProviderSet && cfg.loggerProvider == nil {
+		return nil, errors.New("otelgenai: logger provider must not be nil")
+	}
+
+	loggerProvider := cfg.loggerProvider
+	if loggerProvider == nil {
+		loggerProvider = global.GetLoggerProvider()
+	}
+	logger := loggerProvider.Logger(
+		cfg.instrumentationName,
+		otellog.WithInstrumentationVersion(cfg.instrumentationVersion),
+	)
 
 	if cfg.disabled {
 		return &Instrumenter{
 			tracer:     noop.NewTracerProvider().Tracer(cfg.instrumentationName),
+			logger:     logger,
 			metrics:    noopMetrics(),
 			cfg:        cfg,
 			classifier: cfg.errorClassifier,
@@ -71,18 +87,13 @@ func New(opts ...Option) (*Instrumenter, error) {
 
 	return &Instrumenter{
 		tracer:     tracer,
+		logger:     logger,
 		metrics:    mt,
 		cfg:        cfg,
 		classifier: cfg.errorClassifier,
 		diag:       cfg.diagnosticHandler,
 		pricing:    cfg.pricingResolver,
 	}, nil
-}
-
-// project invokes the configured projector for the given content kind
-// and value, returning the serialized projection or empty string.
-func (in *Instrumenter) project(kind ContentKind, value ContentValue) string {
-	return projectContent(in.cfg.contentProjector, in.cfg.projectionLimit, in.diag, kind, value)
 }
 
 // hasProjector reports whether a content projector is configured.

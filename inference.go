@@ -117,6 +117,9 @@ func (in *Instrumenter) StartInference(ctx context.Context, req Request) (contex
 	if req.Streaming {
 		attrs = append(attrs, attribute.Bool(semconv.AttrGenAIRequestStreaming, true))
 	}
+	if convID := ConversationIDFromContext(ctx); convID != "" {
+		attrs = append(attrs, attribute.String(semconv.AttrGenAIConversationID, convID))
+	}
 
 	// Opt-in content projection at start.
 	if in.hasProjector() && req.SystemInstructions != "" {

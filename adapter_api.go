@@ -35,6 +35,10 @@ const (
 	// recording method was called with an invalid value (e.g. negative
 	// duration or negative count). The measurement is omitted.
 	InstrumentationFailureInvalidMetricValue InstrumentationFailure = "metric.value.invalid"
+	// InstrumentationFailureProviderResolverPanic indicates that an
+	// inference provider-name resolver panicked. The inference-details
+	// event is not emitted and execution continues.
+	InstrumentationFailureProviderResolverPanic InstrumentationFailure = "provider.resolver.panic"
 )
 
 // instrumentationFailureToDiagnostic maps each bounded failure to the
@@ -49,6 +53,8 @@ func instrumentationFailureToDiagnostic(f InstrumentationFailure) safety.Diagnos
 		return safety.Diagnostic{Stage: "tool", Reason: safety.ReasonInvalidToolSpan}
 	case InstrumentationFailureInvalidMetricValue:
 		return safety.Diagnostic{Stage: "metric", Reason: safety.ReasonInvalidMetricValue}
+	case InstrumentationFailureProviderResolverPanic:
+		return safety.Diagnostic{Stage: "provider", Reason: safety.ReasonProviderResolverPanic}
 	default:
 		return safety.Diagnostic{Stage: "adapter", Reason: "unknown"}
 	}

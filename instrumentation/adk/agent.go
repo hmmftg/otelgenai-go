@@ -1,7 +1,6 @@
 package adk
 
 import (
-	"context"
 	"time"
 
 	"google.golang.org/genai"
@@ -27,11 +26,10 @@ func (p *Plugin) afterAgent(ctx callbackContext) (*genai.Content, error) {
 	}
 
 	duration := time.Since(st.start)
-	otelCtx := context.Background()
 
-	p.instr.RecordAgentDuration(otelCtx, duration, st.name)
-	p.instr.RecordAgentInferenceCalls(otelCtx, st.inferenceCalls, st.name)
-	p.instr.RecordAgentToolCalls(otelCtx, st.toolCalls, st.name)
+	p.instr.RecordAgentDuration(ctx, duration, st.name)
+	p.instr.RecordAgentInferenceCalls(ctx, st.inferenceCalls, st.name)
+	p.instr.RecordAgentToolCalls(ctx, st.toolCalls, st.name)
 
 	return nil, nil
 }

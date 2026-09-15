@@ -8,12 +8,14 @@ import (
 
 // callbackContext is the minimal interface the adapter needs from ADK
 // callback contexts. ADK's callbackContextWrapper supports InvocationID,
-// Branch, and AgentName but not Path, RunID, or FunctionCallID.
+// Branch, AgentName, and SessionID but not Path, RunID, or
+// FunctionCallID.
 type callbackContext interface {
 	context.Context
 	InvocationID() string
 	Branch() string
 	AgentName() string
+	SessionID() string
 }
 
 // deriveAgentKey extracts the adapter identity from a callback context.

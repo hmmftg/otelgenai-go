@@ -25,6 +25,8 @@ const (
 	ReasonToolSystemResolverPanic Reason = "tool_system.resolver.panic"
 	ReasonInvalidToolSpan         Reason = "tool.span.invalid"
 	ReasonInvalidMetricValue      Reason = "metric.value.invalid"
+	ReasonInvalidEvent            Reason = "event.invalid"
+	ReasonProviderResolverPanic   Reason = "provider.resolver.panic"
 )
 
 // Diagnostic is a typed diagnostic record containing only a stage

@@ -62,6 +62,9 @@ func (in *Instrumenter) StartTool(ctx context.Context, req ToolRequest) (context
 	if len(req.Attrs) > 0 {
 		attrs = append(attrs, req.Attrs...)
 	}
+	if convID := ConversationIDFromContext(ctx); convID != "" {
+		attrs = append(attrs, attribute.String(semconv.AttrGenAIConversationID, convID))
+	}
 
 	// Add enclosing agent name if available.
 	if agentObs := agentObserverFromContext(ctx); agentObs != nil {

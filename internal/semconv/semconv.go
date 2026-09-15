@@ -61,6 +61,17 @@ const (
 	AttrGenAIToolDefinitions    = "gen_ai.tool.definitions"
 	AttrGenAIToolCallArguments  = "gen_ai.tool.call.arguments"
 	AttrGenAIToolCallResult     = "gen_ai.tool.call.result"
+
+	// Correlation attribute (traces and events only, never metrics).
+	AttrGenAIConversationID = "gen_ai.conversation.id"
+
+	// Event-only attributes following the current upstream GenAI event
+	// schema. These names differ from the pinned span conventions.
+	AttrGenAIProviderName               = "gen_ai.provider.name"
+	AttrGenAIRequestStream              = "gen_ai.request.stream"
+	AttrGenAIEventUsageCacheReadTokens  = "gen_ai.usage.cache_read.input_tokens"
+	AttrGenAIEventUsageCacheWriteTokens = "gen_ai.usage.cache_write.input_tokens"
+	AttrGenAIEventUsageReasoningTokens  = "gen_ai.usage.reasoning.output_tokens"
 )
 
 // Well-known gen_ai.system values.
@@ -88,6 +99,21 @@ const (
 // Well-known gen_ai.tool.type values.
 const (
 	ToolTypeFunction = "function"
+)
+
+// Event names. Event names are static and event-specific; dynamic
+// identity belongs in attributes.
+const (
+	// EventInferenceOperationDetails is the upstream-standard opt-in
+	// event describing a GenAI inference operation's input/output
+	// details independently from traces.
+	EventInferenceOperationDetails = "gen_ai.client.inference.operation.details"
+
+	// The following are repository-owned experimental events.
+	EventToolOperationDetails     = "otelgenai.execute_tool.operation.details"
+	EventAgentModelErrorObserved  = "otelgenai.agent.model.error_observed"
+	EventAgentToolErrorObserved   = "otelgenai.agent.tool.error_observed"
+	EventAgentContinuedAfterError = "otelgenai.agent.continued_after_error"
 )
 
 // Span name templates.

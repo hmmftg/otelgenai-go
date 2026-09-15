@@ -33,6 +33,11 @@ type agentState struct {
 	inferenceCalls int64
 	toolCalls      int64
 	terminalized   bool
+	// pendingError is the classified error type of the most recently
+	// observed child error that has not yet been followed by a
+	// continued_after_error occurrence. Only the first pending error is
+	// retained; continuation clears it.
+	pendingError otelgenai.ErrorType
 }
 
 // modelState tracks one active model operation per agent key.
@@ -43,6 +48,15 @@ type modelState struct {
 	model        string
 	usage        otelgenai.Usage
 	terminalized bool
+	// streaming is set when any partial response was observed.
+	streaming bool
+	// provider is the resolved gen_ai.provider.name for the standard
+	// inference-details event. Empty when no provider is configured.
+	provider string
+	// Content projections captured at BeforeModel, used by the
+	// terminal inference-details event.
+	systemInstructions otelgenai.ProjectedContent
+	inputMessages      otelgenai.ProjectedContent
 }
 
 // toolState tracks one tool execution's lifecycle.
@@ -53,6 +67,9 @@ type toolState struct {
 	start        time.Time
 	name         string
 	terminalized bool
+	// arguments is the projected tool call arguments captured at
+	// BeforeTool for the terminal tool-details event.
+	arguments otelgenai.ProjectedContent
 }
 
 // registry is a race-safe lifecycle state registry owned by one plugin
@@ -142,6 +159,64 @@ func (r *registry) incrementAgentTool(key agentStateKey) {
 	defer r.mu.Unlock()
 	if st, ok := r.agents[key]; ok {
 		st.toolCalls++
+	}
+}
+
+// markPendingError records a classified child error on the agent state
+// so the next BeforeModel/BeforeTool can report continued_after_error.
+// Only the first pending error is retained until consumed.
+func (r *registry) markPendingError(key agentStateKey, et otelgenai.ErrorType) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if st, ok := r.agents[key]; ok && st.pendingError == "" {
+		st.pendingError = et
+	}
+}
+
+// takePendingError returns and clears the pending error type for the
+// agent, reporting whether one was pending.
+func (r *registry) takePendingError(key agentStateKey) (otelgenai.ErrorType, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, ok := r.agents[key]
+	if !ok || st.pendingError == "" {
+		return "", false
+	}
+	et := st.pendingError
+	st.pendingError = ""
+	return et, true
+}
+
+// updateModelRequest records the resolved provider and projected
+// request content on the active model state.
+func (r *registry) updateModelRequest(key agentStateKey, provider string, sys, input otelgenai.ProjectedContent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if st, ok := r.models[key]; ok && !st.terminalized {
+		st.provider = provider
+		st.systemInstructions = sys
+		st.inputMessages = input
+	}
+}
+
+// updateModelUsage records usage and streaming observation on the
+// active model state under the registry lock.
+func (r *registry) updateModelUsage(key agentStateKey, usage otelgenai.Usage, streaming bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if st, ok := r.models[key]; ok && !st.terminalized {
+		st.usage = usage
+		st.streaming = st.streaming || streaming
+	}
+}
+
+// setToolArguments records the projected tool call arguments on the
+// tool state.
+func (r *registry) setToolArguments(key toolStateKey, args otelgenai.ProjectedContent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if st, ok := r.tools[key]; ok && !st.terminalized {
+		st.arguments = args
 	}
 }
 
