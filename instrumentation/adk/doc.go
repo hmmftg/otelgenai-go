@@ -26,13 +26,43 @@
 // # Callback Identity
 //
 // ADK v2.3.0 plugin callback wrappers expose InvocationID(), Branch(),
-// and AgentName(). They do not support Path(), RunID(), or
+// AgentName(), and SessionID(). They do not support Path(), RunID(), or
 // FunctionCallID(). The adapter identity contract is:
 //
 //	agentKey = InvocationID + Branch + AgentName
 //
 // This is an adapter callback-execution identity, not a claim that ADK
 // exposes a universal agent identifier.
+//
+// # Correlated Events
+//
+// In addition to metrics, the adapter emits correlated OTel log-based
+// events through the instrumenter's logger:
+//
+//	gen_ai.client.inference.operation.details   (upstream standard, opt-in)
+//	otelgenai.execute_tool.operation.details    (repository-owned, opt-in)
+//	otelgenai.agent.model.error_observed        (repository-owned)
+//	otelgenai.agent.tool.error_observed         (repository-owned)
+//	otelgenai.agent.continued_after_error       (repository-owned)
+//
+// Content-bearing events carry only projector-controlled content and
+// are emitted only when a ContentProjector is configured on the
+// instrumenter and the logger accepts records. The standard inference
+// event additionally requires a gen_ai.provider.name resolved through
+// WithInferenceProvider or WithInferenceProviderResolver; without one
+// the event is not emitted. Because ADK v2.3.0 ends the
+// generate_content span before AfterModel callbacks run, inference
+// details events are correlated to the enclosing agent trace context,
+// not the ended model span.
+//
+// Occurrence events carry no content and record only that something
+// happened: continued_after_error means the agent started another model
+// or tool call after a previously observed error; it makes no claim
+// about retry, fallback, or recovery.
+//
+// Event timestamps are occurrence times captured at callback entry, not
+// export times. The ADK session ID is reported as
+// gen_ai.conversation.id on events; it is never added to metrics.
 //
 // # Tool Identity
 //
@@ -68,5 +98,10 @@
 //   - No workflow-node (invoke_node) augmentation; ADK already creates
 //     it and exposes no public node callback.
 //   - No default content capture; prompts, responses, tool arguments,
-//     and tool results are never recorded.
+//     and tool results are never recorded unless a ContentProjector is
+//     configured and the logger accepts events.
+//   - ADK's native opt-in content capture
+//     (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT) is outside
+//     the adapter's projector-control boundary and may coexist with
+//     adapter events.
 package adk

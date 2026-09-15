@@ -10,6 +10,61 @@ development.
 
 ## [Unreleased]
 
+### Added (v0.6)
+
+- Correlated OTel log-based events through the Logs API
+  (`go.opentelemetry.io/otel/log` and `otel/sdk/log` pinned to
+  `v0.22.0`, aligned with the repository's OTel `v1.46.0` baseline).
+  - `WithLoggerProvider` option: explicit provider wins; absent, the
+    global LoggerProvider is used; a global no-op provider means no
+    events; explicit nil is rejected.
+  - `WithConversationID` / `ConversationIDFromContext`: canonical
+    conversation correlation attached to spans and events as
+    `gen_ai.conversation.id`; never added to metrics.
+  - `ProjectedContent`: opaque, bounded, non-forgeable projection
+    produced only by `Instrumenter.ProjectContent`; encoded separately
+    for span JSON attributes and structured Logs API values.
+  - `EmitInferenceDetails`: upstream-standard
+    `gen_ai.client.inference.operation.details` event with the
+    supported subset (operation, provider, request/response model,
+    conversation ID, streaming flag, finish reasons, aggregate usage,
+    projected system instructions / input / output messages,
+    `error.type`). Requires `gen_ai.provider.name` and at least one
+    valid projected content field.
+  - `EmitToolDetails`: repository-owned
+    `otelgenai.execute_tool.operation.details` event with projected
+    tool arguments/result or error classification.
+  - `EmitAgentOccurrence`: repository-owned occurrence events
+    (`otelgenai.agent.model.error_observed`,
+    `otelgenai.agent.tool.error_observed`,
+    `otelgenai.agent.continued_after_error`). Continuation is an
+    observation only; no retry/fallback/recovery claim.
+  - Event `Record.Timestamp` is the occurrence time;
+    `ObservedTimestamp` is left to the SDK; zero `OccurredAt` captures
+    time at emitter entry.
+  - `EventsEnabled` / `ContentEventsEnabled` cheap preflights for
+    adapters.
+  - `Message.Parts` / `MessagePart` / `SystemInstructionParts`
+    structured canonical content matching the upstream message-part
+    schema (text, tool_call, tool_call_response).
+  - `InstrumentationFailureProviderResolverPanic` diagnostic.
+- ADK adapter event integration.
+  - `WithInferenceProvider` / `WithInferenceProviderResolver`: resolve
+    `gen_ai.provider.name` for the standard event; never inferred.
+  - Inference details events carry projected request/response content
+    and correlate to the enclosing agent trace context (ADK v2.3.0 ends
+    `generate_content` before `AfterModel` callbacks run).
+  - Tool details events are emitted while the `execute_tool` span is
+    still active and carry projected arguments/result.
+  - Error-observed and continued-after-error occurrences derived from
+    `OnModelError`/`OnToolError` and subsequent `Before*` callbacks.
+  - Occurrence timestamps captured at callback entry.
+  - Session ID mapped to `gen_ai.conversation.id` on events; never on
+    metrics.
+  - Metric recordings now use the callback context instead of
+    `context.Background()`, preserving trace context and exemplars.
+  - No turn spans, duplicate semantic spans, or retry/fallback claims.
+
 ### Added (v0.5)
 
 - Google ADK Go framework integration (`instrumentation/adk` module).

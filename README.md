@@ -223,6 +223,25 @@ model and API.
 | `gen_ai.invoke_agent.tool_calls`        | {tool_call}    | Tool calls per agent                 |
 | `gen_ai.execute_tool.duration`          | s              | Duration of tool executions          |
 
+### Events (opt-in, correlated logs)
+
+Events are emitted through the OTel Logs API and correlated to the
+active trace context. They are opt-in: no events without a logger
+provider that accepts records, and no content without a configured
+`ContentProjector`.
+
+| Event name                                    | Content |
+|-----------------------------------------------|---------|
+| `gen_ai.client.inference.operation.details`   | Upstream standard: models, usage, finish reasons, projected system instructions / input / output messages |
+| `otelgenai.execute_tool.operation.details`    | Repository-owned: projected tool arguments/result, error type |
+| `otelgenai.agent.model.error_observed`        | Repository-owned: model error was observed |
+| `otelgenai.agent.tool.error_observed`         | Repository-owned: tool error was observed |
+| `otelgenai.agent.continued_after_error`       | Repository-owned: agent continued after an observed error (no retry/recovery claim) |
+
+`WithConversationID(ctx, id)` attaches `gen_ai.conversation.id` to spans
+and events; it is never added to metrics. Event timestamps are
+occurrence times, not export times.
+
 ## Pinned convention version
 
 GenAI semantic conventions are still in development. This library
