@@ -48,9 +48,24 @@ on adoption feedback and upstream semantic-convention evolution.
 - `Usage` Godoc corrected: "provider-reported token usage" (not
   "billable usage")
 
-## v0.5 (planned direction)
+## v0.5 (current)
 
-- Framework integrations
+- Google ADK Go framework integration (`instrumentation/adk` module)
+  - ADK plugin adapter pinned to `google.golang.org/adk/v2 v2.3.0`
+  - Reuses ADK-native semantic spans without duplication
+  - Agent metrics only; model metrics only; tool span augmentation
+  - Composite `{TraceID, SpanID}` tool state identity
+  - Invocation-scoped `AfterRunCallback` cleanup
+  - Non-interception: every intercept-capable callback returns `(nil, nil)`
+  - Plugin-first ordering recommendation; arbitrary-order limitation
+  - No default content capture
+- Core: exported adapter-facing APIs
+  - `ClassifyError`, `ReportInstrumentationFailure`
+  - `RecordInferenceUsage`, `RecordInferenceDuration`,
+    `RecordAgentDuration`, `RecordAgentInferenceCalls`,
+    `RecordAgentToolCalls`, `RecordToolDuration`
+  - Semantic-argument API (not arbitrary `attribute.KeyValue`)
+  - Existing metric semantics preserved
 
 ## v1.0 (planned direction)
 

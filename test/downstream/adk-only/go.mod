@@ -1,15 +1,10 @@
-module github.com/hmmftg/otelgenai-go/instrumentation/adk
+module downstream-adk-only
 
 go 1.27.0
 
 require (
 	github.com/hmmftg/otelgenai-go v0.1.0
-	go.opentelemetry.io/otel v1.46.0
-	go.opentelemetry.io/otel/sdk v1.46.0
-	go.opentelemetry.io/otel/sdk/metric v1.46.0
-	go.opentelemetry.io/otel/trace v1.46.0
-	google.golang.org/adk/v2 v2.3.0
-	google.golang.org/genai v1.71.0
+	github.com/hmmftg/otelgenai-go/instrumentation/adk v0.1.0
 )
 
 require (
@@ -30,13 +25,17 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
+	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/log v0.21.0 // indirect
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
+	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/adk/v2 v2.3.0 // indirect
 	google.golang.org/api v0.293.0 // indirect
+	google.golang.org/genai v1.71.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260807164820-c8921c73eeea // indirect
 	google.golang.org/grpc v1.83.1 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
@@ -44,4 +43,6 @@ require (
 	rsc.io/ordered v1.1.1 // indirect
 )
 
-replace github.com/hmmftg/otelgenai-go => ../..
+replace github.com/hmmftg/otelgenai-go => ../../..
+
+replace github.com/hmmftg/otelgenai-go/instrumentation/adk => ../../../instrumentation/adk

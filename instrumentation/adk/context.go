@@ -26,7 +26,7 @@ func agentStateFrom(invocationID, branch, agentName string) agentStateKey {
 	return agentStateKey{
 		InvocationID: invocationID,
 		Branch:       branch,
-		AgentName:     agentName,
+		AgentName:    agentName,
 	}
 }
 

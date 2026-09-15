@@ -4,28 +4,29 @@ import (
 	"context"
 	"testing"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/sdk/metric"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/hmmftg/otelgenai-go"
 )
 
 // newTestInstrumenter creates an Instrumenter with in-memory providers
-// for ADK adapter tests.
-func newTestInstrumenter(t *testing.T) *otelgenai.Instrumenter {
+// for ADK adapter tests. Accepts additional options for diagnostic
+// handlers and other configuration.
+func newTestInstrumenter(t *testing.T, opts ...otelgenai.Option) *otelgenai.Instrumenter {
 	t.Helper()
-	mr := metric.NewManualReader()
-	mp := metric.NewMeterProvider(metric.WithReader(mr))
+	mr := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(mr))
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample()))
 	t.Cleanup(func() {
 		_ = tp.Shutdown(context.Background())
 		_ = mp.Shutdown(context.Background())
 	})
-	instr, err := otelgenai.New(
+	defaultOpts := []otelgenai.Option{
 		otelgenai.WithMeterProvider(mp),
 		otelgenai.WithTracerProvider(tp),
-	)
+	}
+	instr, err := otelgenai.New(append(defaultOpts, opts...)...)
 	if err != nil {
 		t.Fatalf("otelgenai.New: %v", err)
 	}
@@ -67,26 +68,23 @@ func TestNewWithSystemOption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	// The system is stored on the adapter Plugin, not the ADK plugin.
-	// We verify it indirectly through the adapter's String method.
-	adapter := &Plugin{system: "custom-system"}
-	if adapter.system != "custom-system" {
-		t.Fatalf("system = %q, want %q", adapter.system, "custom-system")
+	if p == nil {
+		t.Fatal("New returned nil plugin")
 	}
-	_ = p
 }
 
 func TestNewWithToolSystemResolver(t *testing.T) {
 	instr := newTestInstrumenter(t)
-	resolver := func(t interface{ Name() string }) string {
+	resolver := func(t toolNameProvider) string {
 		return "resolved-system"
 	}
-	_ = resolver
-	p, err := New(instr, WithToolSystemResolver(nil))
+	p, err := New(instr, WithToolSystemResolver(resolver))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	_ = p
+	if p == nil {
+		t.Fatal("New returned nil plugin")
+	}
 }
 
 func TestNewDefaultSystem(t *testing.T) {
@@ -96,12 +94,5 @@ func TestNewDefaultSystem(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	_ = p
-	// Default system should be "adk".
-	adapter := &Plugin{system: "adk"}
-	if adapter.system != "adk" {
-		t.Fatalf("default system = %q, want %q", adapter.system, "adk")
-	}
+	// Default system should be "adk" (verified through lifecycle tests).
 }
-
-// Ensure otel package is used (for potential global provider fallback).
-var _ = otel.GetTracerProvider

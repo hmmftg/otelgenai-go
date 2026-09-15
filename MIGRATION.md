@@ -2,6 +2,42 @@
 
 This document describes how to migrate between versions of otelgenai-go.
 
+## Migrating to v0.5
+
+v0.5 adds the Google ADK Go framework integration and exported
+adapter-facing core APIs while preserving backward compatibility with
+v0.4.
+
+### New features
+
+- **ADK adapter module**: new `instrumentation/adk` module for Google
+  ADK Go v2.3.0.
+  - Install with `go get github.com/hmmftg/otelgenai-go/instrumentation/adk`.
+  - Construct with `adkadapter.New(instr)`.
+  - Register the plugin first in your ADK runner for strongest
+    terminal-metric completeness.
+  - See [ADK README](instrumentation/adk/README.md) for details.
+- **Core adapter-facing APIs**: new exported methods on `Instrumenter`
+  for framework integrations.
+  - `ClassifyError(err error) ErrorType` — panic-isolated error
+    classification; `ClassifyError(nil)` returns `ErrorTypeNone`.
+  - `ReportInstrumentationFailure(f InstrumentationFailure)` — bounded
+    low-cardinality diagnostic reporting.
+  - `RecordInferenceUsage`, `RecordInferenceDuration`,
+    `RecordAgentDuration`, `RecordAgentInferenceCalls`,
+    `RecordAgentToolCalls`, `RecordToolDuration` — semantic-argument
+    metric recording (not arbitrary `attribute.KeyValue`).
+  - Existing metric semantics preserved: zero agent counts recorded
+    once, only positive token components produce measurements.
+
+### Compatibility
+
+- No breaking changes to existing APIs.
+- The ADK module is a separate Go module; it does not affect existing
+  provider adapters.
+- The ADK module is pinned to `google.golang.org/adk/v2 v2.3.0`;
+  upgrading ADK must be treated as a deliberate compatibility change.
+
 ## Migrating to v0.4
 
 v0.4 adds optional pricing/cost estimation and telemetry quality

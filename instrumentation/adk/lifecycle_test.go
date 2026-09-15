@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -17,6 +16,7 @@ import (
 	"github.com/hmmftg/otelgenai-go"
 	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
+	"google.golang.org/genai"
 )
 
 // mockCallbackContext implements callbackContext for testing.
@@ -40,52 +40,61 @@ func newMockCtx(invocationID, branch, agentName string) *mockCallbackContext {
 	}
 }
 
-// newTestPlugin creates a Plugin with test instrumentation.
-func newTestPlugin(t *testing.T, opts ...Option) *Plugin {
-	t.Helper()
-	instr := newTestInstrumenter(t)
-	cfg := config{system: "adk"}
-	for _, opt := range opts {
-		opt(&cfg)
+// withSpan returns a new mockCallbackContext that carries the given
+// span, preserving the callbackContext interface for agent key extraction.
+func (m *mockCallbackContext) withSpan(span oteltrace.Span) *mockCallbackContext {
+	return &mockCallbackContext{
+		Context:      oteltrace.ContextWithSpan(m.Context, span),
+		invocationID: m.invocationID,
+		branch:       m.branch,
+		agentName:    m.agentName,
 	}
+}
+
+// mockTool implements toolNameProvider for testing.
+type mockTool struct {
+	name string
+}
+
+func (m *mockTool) Name() string { return m.name }
+
+// newTestPlugin creates a Plugin with test instrumentation and an optional
+// diagnostic handler.
+func newTestPlugin(t *testing.T, opts ...otelgenai.Option) *Plugin {
+	t.Helper()
+	instr := newTestInstrumenter(t, opts...)
 	return &Plugin{
-		instr:              instr,
-		registry:           newRegistry(),
-		system:             cfg.system,
-		toolSystemResolver: cfg.toolSystemResolver,
+		instr:    instr,
+		registry: newRegistry(),
+		system:   "adk",
 	}
 }
 
 // newTestPluginWithTracer creates a Plugin with a real tracer provider
 // so active spans are available for tool tests.
-func newTestPluginWithTracer(t *testing.T, exporter *tracetest.InMemoryExporter, opts ...Option) (*Plugin, *trace.TracerProvider) {
+func newTestPluginWithTracer(t *testing.T, exporter *tracetest.InMemoryExporter, instrOpts ...otelgenai.Option) (*Plugin, *trace.TracerProvider) {
 	t.Helper()
 	tp := trace.NewTracerProvider(
 		trace.WithSampler(trace.AlwaysSample()),
 		trace.WithSpanProcessor(trace.NewSimpleSpanProcessor(exporter)),
 	)
 	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
-	instr, err := otelgenai.New(otelgenai.WithTracerProvider(tp))
-	if err != nil {
-		t.Fatalf("otelgenai.New: %v", err)
-	}
-	cfg := config{system: "adk"}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
+	instrOpts = append(instrOpts, otelgenai.WithTracerProvider(tp))
+	instr := newTestInstrumenter(t, instrOpts...)
 	return &Plugin{
-		instr:              instr,
-		registry:           newRegistry(),
-		system:             cfg.system,
-		toolSystemResolver: cfg.toolSystemResolver,
+		instr:    instr,
+		registry: newRegistry(),
+		system:   "adk",
 	}, tp
 }
 
-// startToolSpan starts a span named "execute_tool" and returns the
-// context with the active span, mimicking ADK's execute_tool span.
-func startToolSpan(tp *trace.TracerProvider, ctx context.Context, name string) (context.Context, oteltrace.Span) {
+// startToolSpan starts a span named "execute_tool" and returns a
+// mockCallbackContext carrying the span plus the span itself.
+// This preserves the callbackContext interface for agent key extraction.
+func startToolSpan(tp *trace.TracerProvider, ctx *mockCallbackContext, name string) (*mockCallbackContext, oteltrace.Span) {
 	tracer := tp.Tracer("test")
-	return tracer.Start(ctx, "execute_tool "+name, oteltrace.WithSpanKind(oteltrace.SpanKindInternal))
+	_, span := tracer.Start(ctx, "execute_tool "+name, oteltrace.WithSpanKind(oteltrace.SpanKindInternal))
+	return ctx.withSpan(span), span
 }
 
 func TestBeforeAgentCreatesState(t *testing.T) {
@@ -165,12 +174,54 @@ func TestAfterRunCleanupInvocationScoped(t *testing.T) {
 	}
 }
 
+func TestAfterRunReleasesAbandonedLifecycleState(t *testing.T) {
+	p := newTestPlugin(t)
+
+	ctx := newMockCtx("inv1", "root", "agent1")
+	p.beforeAgent(ctx)
+	// Simulate BeforeModel creating state but no AfterModel arriving.
+	p.beforeModel(ctx, "gemini-2.5-flash")
+
+	// AfterRun should clean up the abandoned model state.
+	p.afterRun("inv1")
+
+	if p.registry.getModel(agentStateFrom("inv1", "root", "agent1")) != nil {
+		t.Fatal("abandoned model state not cleaned by AfterRun")
+	}
+	if p.registry.getAgent(agentStateFrom("inv1", "root", "agent1")) != nil {
+		t.Fatal("agent state not cleaned by AfterRun")
+	}
+}
+
+func TestStateCleanupWhenAnotherPluginIntercepts(t *testing.T) {
+	p := newTestPlugin(t)
+
+	ctx := newMockCtx("inv1", "root", "agent1")
+	p.beforeAgent(ctx)
+	p.beforeModel(ctx, "model1")
+
+	// Simulate another plugin intercepting BeforeTool - no AfterTool arrives.
+	// But we need a valid span context for tool state.
+	// Since there's no active span, beforeTool fails closed (no state created).
+	p.beforeTool(ctx, &mockTool{name: "tool1"})
+
+	// AfterRun should clean up abandoned agent and model state.
+	p.afterRun("inv1")
+
+	if p.registry.getAgent(agentStateFrom("inv1", "root", "agent1")) != nil {
+		t.Fatal("agent state not cleaned")
+	}
+	if p.registry.getModel(agentStateFrom("inv1", "root", "agent1")) != nil {
+		t.Fatal("model state not cleaned")
+	}
+}
+
 func TestBeforeModelCreatesState(t *testing.T) {
 	p := newTestPlugin(t)
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
 
-	p.beforeModel(ctx, &mockLLMRequest{Model: "gemini-2.5-flash"})
+	p.beforeModel(ctx, "gemini-2.5-flash")
 
 	st := p.registry.getModel(agentStateFrom("inv1", "root", "agent1"))
 	if st == nil {
@@ -184,7 +235,7 @@ func TestBeforeModelCreatesState(t *testing.T) {
 func TestBeforeModelCollisionPreservesState(t *testing.T) {
 	var diags atomic.Int32
 	p := newTestPlugin(t,
-		WithInstrumenterDiagnosticHandler(func(d safety.Diagnostic) {
+		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
 			if d.Reason == safety.ReasonModelStateConflict {
 				diags.Add(1)
 			}
@@ -193,9 +244,9 @@ func TestBeforeModelCollisionPreservesState(t *testing.T) {
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
 
-	p.beforeModel(ctx, &mockLLMRequest{Model: "model1"})
+	p.beforeModel(ctx, "model1")
 	// Second beforeModel should collide.
-	p.beforeModel(ctx, &mockLLMRequest{Model: "model2"})
+	p.beforeModel(ctx, "model2")
 
 	if diags.Load() != 1 {
 		t.Fatalf("expected 1 model state conflict diagnostic, got %d", diags.Load())
@@ -212,18 +263,15 @@ func TestAfterModelTerminalEmitsMetrics(t *testing.T) {
 	p := newTestPlugin(t)
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
-	p.beforeModel(ctx, &mockLLMRequest{Model: "gemini-2.5-flash"})
+	p.beforeModel(ctx, "gemini-2.5-flash")
 
 	// Terminal response (non-partial).
-	resp := &mockLLMResponse{
-		Partial: false,
-		UsageMetadata: &mockUsageMetadata{
-			PromptTokenCount:     100,
-			CandidatesTokenCount: 200,
-			ThoughtsTokenCount:   50,
-		},
+	usage := &genai.GenerateContentResponseUsageMetadata{
+		PromptTokenCount:     100,
+		CandidatesTokenCount: 200,
+		ThoughtsTokenCount:   50,
 	}
-	p.afterModel(ctx, resp, nil)
+	p.afterModel(ctx, usage, false, nil)
 
 	// State should be deleted.
 	if p.registry.getModel(agentStateFrom("inv1", "root", "agent1")) != nil {
@@ -244,17 +292,14 @@ func TestAfterModelPartialDoesNotTerminalize(t *testing.T) {
 	p := newTestPlugin(t)
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
-	p.beforeModel(ctx, &mockLLMRequest{Model: "gemini-2.5-flash"})
+	p.beforeModel(ctx, "gemini-2.5-flash")
 
 	// Partial response.
-	resp := &mockLLMResponse{
-		Partial: true,
-		UsageMetadata: &mockUsageMetadata{
-			PromptTokenCount:     50,
-			CandidatesTokenCount: 100,
-		},
+	usage := &genai.GenerateContentResponseUsageMetadata{
+		PromptTokenCount:     50,
+		CandidatesTokenCount: 100,
 	}
-	p.afterModel(ctx, resp, nil)
+	p.afterModel(ctx, usage, true, nil)
 
 	// State should still exist.
 	if p.registry.getModel(agentStateFrom("inv1", "root", "agent1")) == nil {
@@ -272,10 +317,10 @@ func TestAfterModelErrorTerminalizes(t *testing.T) {
 	p := newTestPlugin(t)
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
-	p.beforeModel(ctx, &mockLLMRequest{Model: "gemini-2.5-flash"})
+	p.beforeModel(ctx, "gemini-2.5-flash")
 
 	// Terminal with error.
-	p.afterModel(ctx, nil, errors.New("model error"))
+	p.afterModel(ctx, nil, false, errors.New("model error"))
 
 	// State should be deleted.
 	if p.registry.getModel(agentStateFrom("inv1", "root", "agent1")) != nil {
@@ -287,10 +332,10 @@ func TestOnModelErrorIsObservational(t *testing.T) {
 	p := newTestPlugin(t)
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
-	p.beforeModel(ctx, &mockLLMRequest{Model: "gemini-2.5-flash"})
+	p.beforeModel(ctx, "gemini-2.5-flash")
 
 	// onModelError should not terminalize.
-	p.onModelError(ctx, &mockLLMRequest{Model: "gemini-2.5-flash"}, errors.New("error"))
+	p.onModelError()
 
 	// State should still exist.
 	if p.registry.getModel(agentStateFrom("inv1", "root", "agent1")) == nil {
@@ -301,7 +346,7 @@ func TestOnModelErrorIsObservational(t *testing.T) {
 func TestBeforeToolInvalidSpanFailsClosed(t *testing.T) {
 	var diags atomic.Int32
 	p := newTestPlugin(t,
-		WithInstrumenterDiagnosticHandler(func(d safety.Diagnostic) {
+		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
 			if d.Reason == safety.ReasonInvalidToolSpan {
 				diags.Add(1)
 			}
@@ -311,15 +356,21 @@ func TestBeforeToolInvalidSpanFailsClosed(t *testing.T) {
 	p.beforeAgent(ctx)
 
 	// Context without an active span - should fail closed.
-	p.beforeTool(ctx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(ctx, &mockTool{name: "tool1"})
 
 	if diags.Load() != 1 {
 		t.Fatalf("expected 1 invalid tool span diagnostic, got %d", diags.Load())
 	}
 
 	// No tool state should be created.
-	if p.registry.getTool(toolStateKey{}) != nil {
-		t.Fatal("no tool state should be created with invalid span")
+	if len(p.registry.tools) != 0 {
+		t.Fatalf("expected 0 tool states, got %d", len(p.registry.tools))
+	}
+
+	// Agent tool count should NOT be incremented.
+	st := p.registry.getAgent(agentStateFrom("inv1", "root", "agent1"))
+	if st.toolCalls != 0 {
+		t.Fatalf("toolCalls = %d, want 0", st.toolCalls)
 	}
 }
 
@@ -334,7 +385,7 @@ func TestBeforeToolValidSpanCreatesState(t *testing.T) {
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
 	defer span.End()
 
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 
 	// Tool state should be created.
 	sc := oteltrace.SpanFromContext(spanCtx).SpanContext()
@@ -352,10 +403,10 @@ func TestAfterToolEmitsMetricsAndAugmentsSpan(t *testing.T) {
 	p.beforeAgent(ctx)
 
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 
 	// AfterTool with error.
-	p.afterTool(spanCtx, &mockTool{name: "tool1"}, nil, nil, errors.New("tool error"))
+	p.afterTool(spanCtx, errors.New("tool error"))
 	span.End()
 
 	// Tool state should be deleted.
@@ -401,10 +452,10 @@ func TestAfterToolSuccessSetsOKStatus(t *testing.T) {
 	p.beforeAgent(ctx)
 
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 
 	// AfterTool with no error.
-	p.afterTool(spanCtx, &mockTool{name: "tool1"}, nil, nil, nil)
+	p.afterTool(spanCtx, nil)
 	span.End()
 
 	spans := exporter.GetSpans().Snapshots()
@@ -424,10 +475,10 @@ func TestOnToolErrorIsObservational(t *testing.T) {
 	p.beforeAgent(ctx)
 
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 
 	// onToolError should not terminalize.
-	p.onToolError(spanCtx, &mockTool{name: "tool1"}, nil, errors.New("error"))
+	p.onToolError()
 
 	sc := oteltrace.SpanFromContext(spanCtx).SpanContext()
 	key := toolStateKey{TraceID: sc.TraceID(), SpanID: sc.SpanID()}
@@ -445,7 +496,7 @@ func TestBeforeToolSetsToolTypeAttribute(t *testing.T) {
 	p.beforeAgent(ctx)
 
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 	span.End()
 
 	spans := exporter.GetSpans().Snapshots()
@@ -468,22 +519,16 @@ func TestBeforeToolSetsToolTypeAttribute(t *testing.T) {
 
 func TestBeforeToolSystemResolverSetsSystem(t *testing.T) {
 	exporter := tracetest.NewInMemoryExporter()
-	resolver := func(t mockToolInterface) string {
+	p, tp := newTestPluginWithTracer(t, exporter)
+	p.toolSystemResolver = func(t toolNameProvider) string {
 		return "resolved-system"
 	}
-	_ = resolver
-
-	// We need to use a resolver that accepts the ADK tool.Tool interface.
-	// Since we're using mockTool, we need a compatible resolver.
-	p, tp := newTestPluginWithTracer(t, exporter, WithToolSystemResolver(
-		func(t mockToolInterface) string { return "resolved-system" },
-	))
 
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
 
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 	span.End()
 
 	spans := exporter.GetSpans().Snapshots()
@@ -505,22 +550,22 @@ func TestBeforeToolSystemResolverPanicIsIsolated(t *testing.T) {
 	var diags atomic.Int32
 	exporter := tracetest.NewInMemoryExporter()
 	p, tp := newTestPluginWithTracer(t, exporter,
-		WithInstrumenterDiagnosticHandler(func(d safety.Diagnostic) {
+		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
 			if d.Reason == safety.ReasonToolSystemResolverPanic {
 				diags.Add(1)
 			}
 		}),
-		WithToolSystemResolver(func(t mockToolInterface) string {
-			panic("resolver boom")
-		}),
 	)
+	p.toolSystemResolver = func(t toolNameProvider) string {
+		panic("resolver boom")
+	}
 
 	ctx := newMockCtx("inv1", "root", "agent1")
 	p.beforeAgent(ctx)
 
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
 	// Should not panic.
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 	span.End()
 
 	if diags.Load() != 1 {
@@ -544,7 +589,7 @@ func TestBeforeToolNoResolverOmitsSystem(t *testing.T) {
 	p.beforeAgent(ctx)
 
 	spanCtx, span := startToolSpan(tp, ctx, "tool1")
-	p.beforeTool(spanCtx, &mockTool{name: "tool1"}, nil)
+	p.beforeTool(spanCtx, &mockTool{name: "tool1"})
 	span.End()
 
 	spans := exporter.GetSpans().Snapshots()
@@ -571,41 +616,23 @@ func TestCallbacksNeverInterceptExecution(t *testing.T) {
 		t.Fatalf("afterAgent returned (%v, %v), want (nil, nil)", content, err)
 	}
 
-	// BeforeModel should return (nil, nil).
-	resp, err := p.beforeModel(ctx, &mockLLMRequest{Model: "model"})
-	if resp != nil || err != nil {
-		t.Fatalf("beforeModel returned (%v, %v), want (nil, nil)", resp, err)
-	}
+	// BeforeModel returns nothing (void).
+	p.beforeModel(ctx, "model")
 
-	// AfterModel should return (nil, nil).
-	resp, err = p.afterModel(ctx, &mockLLMResponse{Partial: false}, nil)
-	if resp != nil || err != nil {
-		t.Fatalf("afterModel returned (%v, %v), want (nil, nil)", resp, err)
-	}
+	// AfterModel returns nothing (void).
+	p.afterModel(ctx, nil, false, nil)
 
-	// OnModelError should return (nil, nil).
-	resp, err = p.onModelError(ctx, &mockLLMRequest{Model: "model"}, errors.New("err"))
-	if resp != nil || err != nil {
-		t.Fatalf("onModelError returned (%v, %v), want (nil, nil)", resp, err)
-	}
+	// OnModelError returns nothing (void).
+	p.onModelError()
 
-	// BeforeTool should return (nil, nil).
-	result, err := p.beforeTool(ctx, &mockTool{name: "tool"}, nil)
-	if result != nil || err != nil {
-		t.Fatalf("beforeTool returned (%v, %v), want (nil, nil)", result, err)
-	}
+	// BeforeTool returns nothing (void).
+	p.beforeTool(ctx, &mockTool{name: "tool"})
 
-	// AfterTool should return (nil, nil).
-	result, err = p.afterTool(ctx, &mockTool{name: "tool"}, nil, nil, nil)
-	if result != nil || err != nil {
-		t.Fatalf("afterTool returned (%v, %v), want (nil, nil)", result, err)
-	}
+	// AfterTool returns nothing (void).
+	p.afterTool(ctx, nil)
 
-	// OnToolError should return (nil, nil).
-	result, err = p.onToolError(ctx, &mockTool{name: "tool"}, nil, errors.New("err"))
-	if result != nil || err != nil {
-		t.Fatalf("onToolError returned (%v, %v), want (nil, nil)", result, err)
-	}
+	// OnToolError returns nothing (void).
+	p.onToolError()
 }
 
 func TestConcurrentRunsSameSpanIDDoNotCollide(t *testing.T) {
@@ -623,8 +650,8 @@ func TestConcurrentRunsSameSpanIDDoNotCollide(t *testing.T) {
 
 			// Each goroutine starts its own span (different TraceID).
 			spanCtx, span := startToolSpan(tp, ctx, "tool")
-			p.beforeTool(spanCtx, &mockTool{name: "tool"}, nil)
-			p.afterTool(spanCtx, &mockTool{name: "tool"}, nil, nil, nil)
+			p.beforeTool(spanCtx, &mockTool{name: "tool"})
+			p.afterTool(spanCtx, nil)
 			span.End()
 
 			p.afterAgent(ctx)
@@ -634,10 +661,10 @@ func TestConcurrentRunsSameSpanIDDoNotCollide(t *testing.T) {
 }
 
 func TestMapUsageMetadata(t *testing.T) {
-	um := &mockUsageMetadata{
-		PromptTokenCount:     100,
-		CandidatesTokenCount: 200,
-		ThoughtsTokenCount:   50,
+	um := &genai.GenerateContentResponseUsageMetadata{
+		PromptTokenCount:        100,
+		CandidatesTokenCount:    200,
+		ThoughtsTokenCount:      50,
 		CachedContentTokenCount: 30,
 	}
 	usage := mapUsageMetadata(um)
@@ -665,43 +692,17 @@ func TestMapUsageMetadataNil(t *testing.T) {
 	}
 }
 
-// Mock types for testing.
+func TestRegistryEndAgentReturnsDuration(t *testing.T) {
+	r := newRegistry()
+	key := agentStateKey{InvocationID: "inv1", Branch: "root", AgentName: "agent1"}
 
-type mockToolInterface interface {
-	Name() string
-	Description() string
-	IsLongRunning() bool
-}
-
-type mockTool struct {
-	name string
-}
-
-func (m *mockTool) Name() string        { return m.name }
-func (m *mockTool) Description() string { return "test tool" }
-func (m *mockTool) IsLongRunning() bool { return false }
-
-type mockLLMRequest struct {
-	Model string
-}
-
-type mockLLMResponse struct {
-	Partial      bool
-	UsageMetadata *mockUsageMetadata
-}
-
-type mockUsageMetadata struct {
-	PromptTokenCount        int
-	CandidatesTokenCount    int
-	ThoughtsTokenCount      int
-	CachedContentTokenCount int
-}
-
-// WithInstrumenterDiagnosticHandler is a test helper that creates a Plugin
-// with a diagnostic handler. This is needed because the adapter's
-// diagnostic handler is on the Instrumenter, not the Plugin.
-func WithInstrumenterDiagnosticHandler(h safety.DiagnosticHandler) Option {
-	// This is a no-op option; the diagnostic handler is set on the Instrumenter.
-	// We use a different approach in tests: create the Instrumenter with the handler.
-	return func(c *config) {}
+	r.startAgent(key, "agent1")
+	time.Sleep(1 * time.Millisecond)
+	st := r.endAgent(key)
+	if st == nil {
+		t.Fatal("endAgent returned nil")
+	}
+	if time.Since(st.start) <= 0 {
+		t.Fatal("duration should be positive")
+	}
 }

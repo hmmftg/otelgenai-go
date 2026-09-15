@@ -10,6 +10,42 @@ development.
 
 ## [Unreleased]
 
+### Added (v0.5)
+
+- Google ADK Go framework integration (`instrumentation/adk` module).
+  - ADK plugin adapter pinned to `google.golang.org/adk/v2 v2.3.0`.
+  - Reuses ADK-native semantic spans (`invoke_agent`, `generate_content`,
+    `execute_tool`) without duplication.
+  - Agent metrics only (duration, inference count, tool count); no
+    adapter-owned agent span attributes.
+  - Model metrics only (duration, token usage); no model span mutation.
+  - Tool span augmentation with adapter-owned `gen_ai.tool.type` and
+    final `error.type`/status while the span is active.
+  - Composite `{TraceID, SpanID}` tool state identity prevents
+    cross-trace collisions in concurrent runs.
+  - Invocation-scoped `AfterRunCallback` cleanup of abandoned lifecycle
+    state without synthesizing terminal metrics.
+  - Invalid active `execute_tool` span context fails closed: no state,
+    no metrics, no parent counter increment.
+  - Non-interception: every intercept-capable callback returns
+    `(nil, nil)`.
+  - Plugin-first ordering recommendation for strongest terminal-metric
+    completeness; arbitrary-order limitation documented.
+  - `WithSystem` and `WithToolSystemResolver` options.
+  - No default content capture.
+- Core: exported adapter-facing APIs for framework integrations.
+  - `ClassifyError(err error) ErrorType` with panic isolation;
+    `ClassifyError(nil)` returns `ErrorTypeNone`.
+  - `ReportInstrumentationFailure(f InstrumentationFailure)` bounded
+    low-cardinality diagnostic reporting.
+  - `RecordInferenceUsage`, `RecordInferenceDuration`,
+    `RecordAgentDuration`, `RecordAgentInferenceCalls`,
+    `RecordAgentToolCalls`, `RecordToolDuration` with semantic
+    arguments (not arbitrary `attribute.KeyValue`).
+  - Existing metric semantics preserved: zero agent counts recorded
+    once, only positive token components produce measurements,
+    negative values fail closed with diagnostics.
+
 ### Added (v0.4)
 
 - Optional pricing resolver (`pricing` subpackage) for estimated cost

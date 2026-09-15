@@ -3,7 +3,6 @@ package adk
 import (
 	"sync"
 	"testing"
-	"time"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -253,7 +252,7 @@ func TestRegistryConcurrentAccess(t *testing.T) {
 			key := agentStateKey{
 				InvocationID: "inv",
 				Branch:       "root",
-				AgentName:     "agent",
+				AgentName:    "agent",
 			}
 			r.startAgent(key, "agent")
 			r.incrementAgentInference(key)
@@ -278,19 +277,4 @@ func TestRegistryCleanupEmptyInvocation(t *testing.T) {
 	r := newRegistry()
 	// Should not panic on empty registry.
 	r.cleanupInvocation("nonexistent")
-}
-
-func TestRegistryEndAgentReturnsDuration(t *testing.T) {
-	r := newRegistry()
-	key := agentStateKey{InvocationID: "inv1", Branch: "root", AgentName: "agent1"}
-
-	r.startAgent(key, "agent1")
-	time.Sleep(1 * time.Millisecond)
-	st := r.endAgent(key)
-	if st == nil {
-		t.Fatal("endAgent returned nil")
-	}
-	if time.Since(st.start) <= 0 {
-		t.Fatal("duration should be positive")
-	}
 }

@@ -33,7 +33,8 @@ otelgenai-go/
 ├── instrumentation/openai/        # OpenAI adapter module
 ├── instrumentation/anthropic/     # Anthropic adapter module
 ├── instrumentation/google-genai/  # Google GenAI adapter module
-└── instrumentation/mcp/           # MCP adapter module
+├── instrumentation/mcp/           # MCP adapter module
+└── instrumentation/adk/           # Google ADK Go adapter module
 ```
 
 The core module depends only on OpenTelemetry API packages. Each

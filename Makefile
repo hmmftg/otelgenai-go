@@ -27,6 +27,7 @@ tidy:
 	cd instrumentation/anthropic && go mod tidy
 	cd instrumentation/google-genai && go mod tidy
 	cd instrumentation/mcp && go mod tidy
+	cd instrumentation/adk && go mod tidy
 
 lint: vet
 	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run ./... || echo "golangci-lint not installed, skipping"
@@ -43,6 +44,7 @@ downstream:
 	cd test/downstream/anthropic-only && GOWORK=off go build ./...
 	cd test/downstream/google-genai-only && GOWORK=off go build ./...
 	cd test/downstream/mcp-only && GOWORK=off go build ./...
+	cd test/downstream/adk-only && GOWORK=off go build ./...
 
 clean:
 	rm -f coverage.out benchmarks.txt

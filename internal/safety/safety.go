@@ -13,18 +13,18 @@ type Reason string
 // Reason values are low-cardinality diagnostic reason codes for each
 // failure stage of content projection and callback execution.
 const (
-	ReasonProjectorPanic    Reason = "projector.panic"
-	ReasonProjectorError    Reason = "projector.error"
-	ReasonProjectorOversize Reason = "projector.oversize"
-	ReasonProjectorInvalid  Reason = "projector.invalid_shape"
-	ReasonProjectorBadJSON  Reason = "projector.invalid_json"
-	ReasonClassifierPanic   Reason = "classifier.panic"
-	ReasonDiagnosticPanic   Reason = "diagnostic.panic"
-	ReasonResolverPanic     Reason = "pricing.resolver.panic"
+	ReasonProjectorPanic          Reason = "projector.panic"
+	ReasonProjectorError          Reason = "projector.error"
+	ReasonProjectorOversize       Reason = "projector.oversize"
+	ReasonProjectorInvalid        Reason = "projector.invalid_shape"
+	ReasonProjectorBadJSON        Reason = "projector.invalid_json"
+	ReasonClassifierPanic         Reason = "classifier.panic"
+	ReasonDiagnosticPanic         Reason = "diagnostic.panic"
+	ReasonResolverPanic           Reason = "pricing.resolver.panic"
 	ReasonModelStateConflict      Reason = "model.state.conflict"
 	ReasonToolSystemResolverPanic Reason = "tool_system.resolver.panic"
-	ReasonInvalidToolSpan          Reason = "tool.span.invalid"
-	ReasonInvalidMetricValue       Reason = "metric.value.invalid"
+	ReasonInvalidToolSpan         Reason = "tool.span.invalid"
+	ReasonInvalidMetricValue      Reason = "metric.value.invalid"
 )
 
 // Diagnostic is a typed diagnostic record containing only a stage

@@ -25,6 +25,7 @@ jobs:
           cd ../anthropic && go mod tidy
           cd ../google-genai && go mod tidy
           cd ../mcp && go mod tidy
+          cd ../adk && go mod tidy
           cd ../.. && git diff --exit-code
       - name: Go vet
         run: go vet ./...
@@ -51,6 +52,8 @@ jobs:
         run: cd instrumentation/google-genai && go test -race ./...
       - name: Race test (mcp)
         run: cd instrumentation/mcp && go test -race ./...
+      - name: Race test (adk)
+        run: cd instrumentation/adk && GOWORK=off go test -race ./...
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
@@ -75,6 +78,8 @@ jobs:
         run: cd test/downstream/google-genai-only && GOWORK=off go build ./...
       - name: MCP-only consumer
         run: cd test/downstream/mcp-only && GOWORK=off go build ./...
+      - name: ADK-only consumer
+        run: cd test/downstream/adk-only && GOWORK=off go build ./...
 
   benchmark:
     name: Benchmark
