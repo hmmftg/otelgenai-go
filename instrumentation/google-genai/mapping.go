@@ -4,7 +4,6 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/semconv"
 )
 
 // mapGenerateContentRequest builds the provider-neutral otelgenai.Request
@@ -13,7 +12,7 @@ import (
 // output text are never mapped to preserve safe-by-default behavior.
 func mapGenerateContentRequest(model string, config *genai.GenerateContentConfig, streaming bool, system string) otelgenai.Request {
 	req := otelgenai.Request{
-		Operation: otelgenai.Operation(semconv.OperationGenerateContent),
+		Operation: otelgenai.OperationGenerateContent,
 		Provider:  system,
 		Model:     model,
 		Streaming: streaming,

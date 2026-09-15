@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/hmmftg/otelgenai-go"
 	"github.com/hmmftg/otelgenai-go/internal/safety"
+	"github.com/hmmftg/otelgenai-go/internal/semconv"
 	"github.com/hmmftg/otelgenai-go/testutil"
 )
 
@@ -349,4 +351,240 @@ func TestAdapterAPIInferenceUsageDimensions(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestApplySpanOutcome_Error sets error.type and Error status on the
+// active span when err is non-nil.
+func TestApplySpanOutcome_Error(t *testing.T) {
+	instr, rec := newAdapterTestInstrumenter(t)
+	tracer := rec.TracerProvider().Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "op")
+
+	instr.ApplySpanOutcome(ctx, errors.New("fail"))
+	span.End()
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	s := spans[0]
+	testutil.AssertErrorType(t, s, string(otelgenai.ErrorTypeUnknown))
+	testutil.AssertSpanStatus(t, s, codes.Error)
+}
+
+// TestApplySpanOutcome_Success sets OK status when err is nil.
+func TestApplySpanOutcome_Success(t *testing.T) {
+	instr, rec := newAdapterTestInstrumenter(t)
+	tracer := rec.TracerProvider().Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "op")
+
+	instr.ApplySpanOutcome(ctx, nil)
+	span.End()
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	testutil.AssertSpanStatus(t, spans[0], codes.Ok)
+}
+
+// TestApplySpanOutcome_DisabledIsNoop does not touch the span when
+// instrumentation is disabled.
+func TestApplySpanOutcome_DisabledIsNoop(t *testing.T) {
+	instr, rec := newAdapterTestInstrumenter(t, otelgenai.Disabled())
+	tracer := rec.TracerProvider().Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "op")
+
+	instr.ApplySpanOutcome(ctx, errors.New("fail"))
+	span.End()
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	testutil.AssertAttrNotPresent(t, spans[0], semconv.AttrErrorType)
+}
+
+// TestApplySpanOutcome_NoSpanInContext is a no-op when no active span
+// exists in the context.
+func TestApplySpanOutcome_NoSpanInContext(t *testing.T) {
+	instr, _ := newAdapterTestInstrumenter(t)
+	// Must not panic.
+	instr.ApplySpanOutcome(context.Background(), errors.New("fail"))
+}
+
+// TestApplySpanOutcome_PanickingClassifier reports a diagnostic and sets
+// error.type=unknown without crashing.
+func TestApplySpanOutcome_PanickingClassifier(t *testing.T) {
+	var diags atomic.Int32
+	instr, rec := newAdapterTestInstrumenter(t,
+		otelgenai.WithErrorClassifier(func(err error) otelgenai.ErrorType {
+			panic("boom")
+		}),
+		otelgenai.WithDiagnosticHandler(func(d safety.Diagnostic) {
+			if d.Reason == safety.ReasonClassifierPanic {
+				diags.Add(1)
+			}
+		}),
+	)
+	tracer := rec.TracerProvider().Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "op")
+
+	instr.ApplySpanOutcome(ctx, errors.New("fail"))
+	span.End()
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	testutil.AssertErrorType(t, spans[0], string(otelgenai.ErrorTypeUnknown))
+	if diags.Load() != 1 {
+		t.Fatalf("expected 1 classifier.panic diagnostic, got %d", diags.Load())
+	}
+}
+
+// TestAugmentToolSpan_SetsDefaults sets gen_ai.tool.type=function by
+// default and gen_ai.system when provided.
+func TestAugmentToolSpan_SetsDefaults(t *testing.T) {
+	instr, rec := newAdapterTestInstrumenter(t)
+	tracer := rec.TracerProvider().Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "execute_tool")
+
+	instr.AugmentToolSpan(ctx, otelgenai.ToolSpanAttributes{System: "openai"})
+	span.End()
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	s := spans[0]
+	testutil.AssertAttr(t, s, "gen_ai.tool.type", attribute.StringValue("function"))
+	testutil.AssertAttr(t, s, "gen_ai.system", attribute.StringValue("openai"))
+}
+
+// TestAugmentToolSpan_CustomType sets a custom tool type.
+func TestAugmentToolSpan_CustomType(t *testing.T) {
+	instr, rec := newAdapterTestInstrumenter(t)
+	tracer := rec.TracerProvider().Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "execute_tool")
+
+	instr.AugmentToolSpan(ctx, otelgenai.ToolSpanAttributes{Type: "mcp"})
+	span.End()
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	s := spans[0]
+	testutil.AssertAttr(t, s, "gen_ai.tool.type", attribute.StringValue("mcp"))
+	testutil.AssertAttrNotPresent(t, s, "gen_ai.system")
+}
+
+// TestAugmentToolSpan_DisabledIsNoop does not touch the span when
+// instrumentation is disabled.
+func TestAugmentToolSpan_DisabledIsNoop(t *testing.T) {
+	instr, rec := newAdapterTestInstrumenter(t, otelgenai.Disabled())
+	tracer := rec.TracerProvider().Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "execute_tool")
+
+	instr.AugmentToolSpan(ctx, otelgenai.ToolSpanAttributes{System: "openai"})
+	span.End()
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	testutil.AssertAttrNotPresent(t, spans[0], "gen_ai.tool.type")
+}
+
+// TestAugmentToolSpan_NoSpanInContext is a no-op when no active span
+// exists in the context.
+func TestAugmentToolSpan_NoSpanInContext(t *testing.T) {
+	instr, _ := newAdapterTestInstrumenter(t)
+	// Must not panic.
+	instr.AugmentToolSpan(context.Background(), otelgenai.ToolSpanAttributes{System: "openai"})
+}
+
+// TestWellKnownConstants verifies the exported well-known operation and
+// system constants match the internal semconv values.
+func TestWellKnownConstants(t *testing.T) {
+	opTests := []struct {
+		exported otelgenai.Operation
+		internal string
+	}{
+		{otelgenai.OperationChat, semconv.OperationChat},
+		{otelgenai.OperationGenerateContent, semconv.OperationGenerateContent},
+		{otelgenai.OperationTextCompletion, semconv.OperationTextCompletion},
+		{otelgenai.OperationEmbeddings, semconv.OperationEmbeddings},
+		{otelgenai.OperationInvokeAgent, semconv.OperationInvokeAgent},
+		{otelgenai.OperationExecuteTool, semconv.OperationExecuteTool},
+	}
+	for _, tt := range opTests {
+		if string(tt.exported) != tt.internal {
+			t.Errorf("Operation mismatch: exported=%q internal=%q", tt.exported, tt.internal)
+		}
+	}
+
+	sysTests := []struct {
+		exported string
+		internal string
+	}{
+		{otelgenai.SystemOpenAI, semconv.GenAISystemOpenAI},
+		{otelgenai.SystemAnthropic, semconv.GenAISystemAnthropic},
+	}
+	for _, tt := range sysTests {
+		if tt.exported != tt.internal {
+			t.Errorf("System mismatch: exported=%q internal=%q", tt.exported, tt.internal)
+		}
+	}
+}
+
+// TestVersionConstant verifies the Version constant is set for the
+// v0.6.0 release.
+func TestVersionConstant(t *testing.T) {
+	if otelgenai.Version != "0.6.0" {
+		t.Fatalf("Version = %q, want %q", otelgenai.Version, "0.6.0")
+	}
+}
+
+// TestDefaultInstrumentationVersion verifies the default instrumentation
+// scope version is the library Version, not the stale 0.1.0.
+func TestDefaultInstrumentationVersion(t *testing.T) {
+	rec := testutil.NewRecorder()
+	defer rec.Shutdown(context.Background())
+
+	instr, err := otelgenai.New(
+		otelgenai.WithTracerProvider(rec.TracerProvider()),
+		otelgenai.WithMeterProvider(rec.MeterProvider()),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	_, op := instr.StartInference(context.Background(), otelgenai.Request{
+		Operation: otelgenai.OperationChat,
+		Provider:  "openai",
+		Model:     "gpt-4o",
+	})
+	op.End(otelgenai.Response{}, nil)
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	s := spans[0]
+	sc := s.InstrumentationScope()
+	if sc.Version != otelgenai.Version {
+		t.Fatalf("instrumentation version = %q, want %q", sc.Version, otelgenai.Version)
+	}
+}
+
+// TestApplySpanOutcome_InvalidSpanContext is a no-op when the active
+// span has an invalid span context (e.g. a no-op span).
+func TestApplySpanOutcome_InvalidSpanContext(t *testing.T) {
+	instr, _ := newAdapterTestInstrumenter(t)
+	// A context with no span has an invalid (zero) span context.
+	ctx := context.Background()
+	// Must not panic and must not set any attributes.
+	instr.ApplySpanOutcome(ctx, errors.New("fail"))
 }

@@ -101,10 +101,7 @@ func (t *ToolOperation) End(err error) {
 	t.mu.Unlock()
 
 	if err != nil {
-		et := t.in.classifyError(err)
-		if et == ErrorTypeNone {
-			et = ErrorTypeUnknown
-		}
+		et := t.in.ClassifyError(err)
 		t.span.SetAttributes(attribute.String(semconv.AttrErrorType, string(et)))
 		t.span.SetStatus(codes.Error, "")
 	} else {

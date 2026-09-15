@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/hmmftg/otelgenai-go/internal/safety"
 	"github.com/hmmftg/otelgenai-go/internal/semconv"
@@ -104,6 +106,80 @@ func (in *Instrumenter) ReportInstrumentationFailure(f InstrumentationFailure) {
 		return
 	}
 	safety.GuardedDiagnostic(in.diag, instrumentationFailureToDiagnostic(f))
+}
+
+// ApplySpanOutcome classifies err through the configured (panic-isolated)
+// ErrorClassifier and applies the low-cardinality gen_ai error.type
+// attribute and OTel status to the active span in ctx. On nil err it sets
+// OK status. When instrumentation is disabled, the active span is not
+// recording, or the span context is invalid, this is a no-op.
+//
+// Framework adapters call this inside native semantic-span callbacks to
+// stamp the final outcome of an operation whose span is owned by the
+// framework rather than by otelgenai-go. It never records raw error
+// messages, panic values, or content.
+func (in *Instrumenter) ApplySpanOutcome(ctx context.Context, err error) {
+	if in.cfg.disabled {
+		return
+	}
+	span := trace.SpanFromContext(ctx)
+	if span == nil {
+		return
+	}
+	sc := span.SpanContext()
+	if !sc.IsValid() {
+		return
+	}
+	if err != nil {
+		et := in.ClassifyError(err)
+		span.SetAttributes(attribute.String(semconv.AttrErrorType, string(et)))
+		span.SetStatus(codes.Error, "")
+		return
+	}
+	span.SetStatus(codes.Ok, "")
+}
+
+// ToolSpanAttributes carries the semantic attributes a framework adapter
+// wants applied to an active execute_tool span. Only well-known,
+// low-cardinality fields are accepted; arbitrary attribute keys are not
+// exposed.
+type ToolSpanAttributes struct {
+	// Type is the gen_ai.tool.type value. When empty, "function" is used.
+	Type string
+	// System is the gen_ai.system value identifying the provider. When
+	// empty, no gen_ai.system attribute is set.
+	System string
+}
+
+// AugmentToolSpan applies the semantic ToolSpanAttributes to the active
+// execute_tool span in ctx. It sets gen_ai.tool.type (defaulting to
+// "function" when empty) and gen_ai.system (only when non-empty). When
+// instrumentation is disabled, the active span is not recording, or the
+// span context is invalid, this is a no-op.
+//
+// Framework adapters call this inside native tool-span callbacks to
+// decorate a framework-owned span with canonical GenAI attributes
+// without gaining access to arbitrary attribute construction.
+func (in *Instrumenter) AugmentToolSpan(ctx context.Context, attrs ToolSpanAttributes) {
+	if in.cfg.disabled {
+		return
+	}
+	span := trace.SpanFromContext(ctx)
+	if span == nil {
+		return
+	}
+	sc := span.SpanContext()
+	if !sc.IsValid() {
+		return
+	}
+	toolType := attrs.Type
+	if toolType == "" {
+		toolType = semconv.ToolTypeFunction
+	}
+	span.SetAttributes(attribute.String(semconv.AttrGenAIToolType, toolType))
+	if attrs.System != "" {
+		span.SetAttributes(attribute.String(semconv.AttrGenAISystem, attrs.System))
+	}
 }
 
 // RecordInferenceUsage records token usage metrics for an inference

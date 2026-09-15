@@ -4,7 +4,6 @@ import (
 	anth "github.com/anthropics/anthropic-sdk-go"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/semconv"
 )
 
 // mapMessageResponse converts an Anthropic Message to the
@@ -55,8 +54,8 @@ func mapDeltaUsage(u anth.MessageDeltaUsage) otelgenai.Usage {
 // Message parameters.
 func mapMessageRequest(params anth.MessageNewParams, streaming bool) otelgenai.Request {
 	req := otelgenai.Request{
-		Operation: otelgenai.Operation(semconv.OperationChat),
-		Provider:  semconv.GenAISystemAnthropic,
+		Operation: otelgenai.OperationChat,
+		Provider:  otelgenai.SystemAnthropic,
 		Model:     string(params.Model),
 		Streaming: streaming,
 	}

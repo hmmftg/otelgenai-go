@@ -152,10 +152,7 @@ func (a *AgentOperation) End(err error) {
 	a.mu.Unlock()
 
 	if err != nil {
-		et := a.in.classifyError(err)
-		if et == ErrorTypeNone {
-			et = ErrorTypeUnknown
-		}
+		et := a.in.ClassifyError(err)
 		a.span.SetAttributes(attribute.String(semconv.AttrErrorType, string(et)))
 		a.span.SetStatus(codes.Error, "")
 	} else {

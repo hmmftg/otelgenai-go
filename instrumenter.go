@@ -100,12 +100,3 @@ func New(opts ...Option) (*Instrumenter, error) {
 func (in *Instrumenter) hasProjector() bool {
 	return in.cfg.contentProjector != nil
 }
-
-// classifyError maps an error to a low-cardinality ErrorType using the
-// configured classifier.
-func (in *Instrumenter) classifyError(err error) ErrorType {
-	if err == nil {
-		return ErrorTypeNone
-	}
-	return in.classifier(err)
-}

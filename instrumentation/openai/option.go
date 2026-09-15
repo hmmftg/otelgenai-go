@@ -1,6 +1,6 @@
 package openai
 
-import "github.com/hmmftg/otelgenai-go/internal/semconv"
+import "github.com/hmmftg/otelgenai-go"
 
 // adapterConfig holds adapter-level configuration resolved from
 // adapter Options. The default system is "openai".
@@ -11,7 +11,7 @@ type adapterConfig struct {
 // defaultAdapterConfig returns the safe default adapter configuration.
 func defaultAdapterConfig() adapterConfig {
 	return adapterConfig{
-		system: semconv.GenAISystemOpenAI,
+		system: otelgenai.SystemOpenAI,
 	}
 }
 
@@ -30,7 +30,7 @@ type Option func(*adapterConfig)
 func WithSystem(system string) Option {
 	return func(c *adapterConfig) {
 		if system == "" {
-			c.system = semconv.GenAISystemOpenAI
+			c.system = otelgenai.SystemOpenAI
 			return
 		}
 		c.system = system

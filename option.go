@@ -43,7 +43,7 @@ func defaultConfig() config {
 
 const (
 	defaultInstrumentationName    = "otelgenai-go"
-	defaultInstrumentationVersion = "0.1.0"
+	defaultInstrumentationVersion = Version
 	defaultProjectionLimit        = 4096
 )
 

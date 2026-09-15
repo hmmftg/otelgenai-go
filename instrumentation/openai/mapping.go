@@ -17,7 +17,6 @@ import (
 	"github.com/openai/openai-go/responses"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/semconv"
 )
 
 // mapChatCompletionResponse converts an OpenAI ChatCompletion to the
@@ -53,7 +52,7 @@ func mapCompletionUsage(u oai.CompletionUsage) otelgenai.Usage {
 // gen_ai.system attribute for OpenAI-compatible providers.
 func mapChatRequest(params oai.ChatCompletionNewParams, streaming bool, system string) otelgenai.Request {
 	req := otelgenai.Request{
-		Operation: otelgenai.Operation(semconv.OperationChat),
+		Operation: otelgenai.OperationChat,
 		Provider:  system,
 		Model:     string(params.Model),
 		Streaming: streaming,
@@ -98,7 +97,7 @@ func mapEmbeddingResponse(r *oai.CreateEmbeddingResponse) otelgenai.Response {
 // gen_ai.system attribute for OpenAI-compatible providers.
 func mapEmbeddingRequest(params oai.EmbeddingNewParams, system string) otelgenai.Request {
 	return otelgenai.Request{
-		Operation: otelgenai.Operation(semconv.OperationEmbeddings),
+		Operation: otelgenai.OperationEmbeddings,
 		Provider:  system,
 		Model:     string(params.Model),
 	}
@@ -138,7 +137,7 @@ func mapResponseResponse(r *responses.Response) otelgenai.Response {
 // gen_ai.system attribute for OpenAI-compatible providers.
 func mapResponseRequest(params responses.ResponseNewParams, streaming bool, system string) otelgenai.Request {
 	req := otelgenai.Request{
-		Operation: otelgenai.Operation(semconv.OperationGenerateContent),
+		Operation: otelgenai.OperationGenerateContent,
 		Provider:  system,
 		Model:     string(params.Model),
 		Streaming: streaming,

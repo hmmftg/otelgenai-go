@@ -7,7 +7,6 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/safety"
 )
 
 // beforeModel creates model state for the agent key if no active model
@@ -28,7 +27,7 @@ func (p *Plugin) beforeModel(ctx callbackContext, req *model.LLMRequest, occurre
 		p.instr.EmitAgentOccurrence(ctx, otelgenai.AgentOccurrence{
 			Kind:           otelgenai.OccurrenceContinuedAfterError,
 			AgentName:      ctx.AgentName(),
-			Operation:      otelgenai.Operation("generate_content"),
+			Operation:      otelgenai.OperationGenerateContent,
 			ConversationID: ctx.SessionID(),
 			ErrorType:      et,
 			OccurredAt:     occurredAt,
@@ -96,8 +95,8 @@ func (p *Plugin) afterModel(ctx callbackContext, resp *model.LLMResponse, llmRes
 
 	duration := time.Since(termSt.start)
 
-	p.instr.RecordInferenceDuration(ctx, duration, p.system, termSt.model, otelgenai.Operation("generate_content"))
-	p.instr.RecordInferenceUsage(ctx, termSt.usage, p.system, termSt.model, otelgenai.Operation("generate_content"))
+	p.instr.RecordInferenceDuration(ctx, duration, p.system, termSt.model, otelgenai.OperationGenerateContent)
+	p.instr.RecordInferenceUsage(ctx, termSt.usage, p.system, termSt.model, otelgenai.OperationGenerateContent)
 	p.registry.incrementAgentInference(key)
 
 	if llmResponseError != nil {
@@ -116,7 +115,7 @@ func (p *Plugin) afterModel(ctx callbackContext, resp *model.LLMResponse, llmRes
 		return
 	}
 	details := otelgenai.InferenceDetails{
-		Operation:          otelgenai.Operation("generate_content"),
+		Operation:          otelgenai.OperationGenerateContent,
 		Provider:           termSt.provider,
 		RequestModel:       termSt.model,
 		ConversationID:     ctx.SessionID(),
@@ -161,7 +160,7 @@ func (p *Plugin) onModelError(ctx callbackContext, err error, occurredAt time.Ti
 	p.instr.EmitAgentOccurrence(ctx, otelgenai.AgentOccurrence{
 		Kind:           otelgenai.OccurrenceModelErrorObserved,
 		AgentName:      ctx.AgentName(),
-		Operation:      otelgenai.Operation("generate_content"),
+		Operation:      otelgenai.OperationGenerateContent,
 		ConversationID: ctx.SessionID(),
 		ErrorType:      et,
 		OccurredAt:     occurredAt,
@@ -176,11 +175,7 @@ func (p *Plugin) onModelError(ctx callbackContext, err error, occurredAt time.Ti
 func (p *Plugin) resolveInferenceProvider(modelName string) (string, bool) {
 	if p.providerResolver != nil {
 		var name string
-		panicErr := safety.GuardedCall(func() error {
-			name = p.providerResolver(modelName)
-			return nil
-		})
-		if panicErr != nil {
+		if !guardedCall(func() { name = p.providerResolver(modelName) }) {
 			p.instr.ReportInstrumentationFailure(otelgenai.InstrumentationFailureProviderResolverPanic)
 			return "", false
 		}

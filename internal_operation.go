@@ -30,6 +30,11 @@ type InternalOperation struct {
 // attributes. It does not increment any agent counters. When
 // instrumentation is disabled, returns a nil operation whose End is
 // nil-safe.
+//
+// When a conversation ID is present in ctx (via WithConversationID), it
+// is attached to the span as gen_ai.conversation.id. The caller-supplied
+// attrs slice is never mutated; a new slice is constructed when a
+// conversation ID is present.
 func (in *Instrumenter) StartInternalOperation(
 	ctx context.Context,
 	name string,
@@ -38,9 +43,15 @@ func (in *Instrumenter) StartInternalOperation(
 	if in.cfg.disabled {
 		return ctx, nil
 	}
+	spanAttrs := attrs
+	if convID := ConversationIDFromContext(ctx); convID != "" {
+		spanAttrs = make([]attribute.KeyValue, 0, len(attrs)+1)
+		spanAttrs = append(spanAttrs, attrs...)
+		spanAttrs = append(spanAttrs, attribute.String(semconv.AttrGenAIConversationID, convID))
+	}
 	ctx, span := in.tracer.Start(ctx, name,
 		trace.WithSpanKind(trace.SpanKindInternal),
-		trace.WithAttributes(attrs...),
+		trace.WithAttributes(spanAttrs...),
 	)
 	return ctx, &InternalOperation{
 		span: span,
@@ -66,10 +77,7 @@ func (op *InternalOperation) End(err error) {
 	op.mu.Unlock()
 
 	if err != nil {
-		et := op.in.classifyError(err)
-		if et == ErrorTypeNone {
-			et = ErrorTypeUnknown
-		}
+		et := op.in.ClassifyError(err)
 		op.span.SetAttributes(attribute.String(semconv.AttrErrorType, string(et)))
 		op.span.SetStatus(codes.Error, "")
 	} else {

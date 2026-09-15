@@ -257,10 +257,7 @@ func (op *InferenceOperation) End(resp Response, err error) {
 
 	// Error handling: low-cardinality error.type, no raw message.
 	if err != nil {
-		et := op.in.classifyError(err)
-		if et == ErrorTypeNone {
-			et = ErrorTypeUnknown
-		}
+		et := op.in.ClassifyError(err)
 		attrs = append(attrs, attribute.String(semconv.AttrErrorType, string(et)))
 		op.span.SetStatus(codes.Error, "")
 	} else {

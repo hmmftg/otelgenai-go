@@ -4,12 +4,7 @@ import (
 	"context"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/hmmftg/otelgenai-go"
-	"github.com/hmmftg/otelgenai-go/internal/safety"
-	"github.com/hmmftg/otelgenai-go/internal/semconv"
 )
 
 // toolNameProvider is the minimal interface the adapter needs from an
@@ -32,7 +27,7 @@ func (p *Plugin) beforeTool(ctx context.Context, t toolNameProvider, args map[st
 		p.instr.EmitAgentOccurrence(ctx, otelgenai.AgentOccurrence{
 			Kind:           otelgenai.OccurrenceContinuedAfterError,
 			AgentName:      agentKey.AgentName,
-			Operation:      otelgenai.Operation("execute_tool"),
+			Operation:      otelgenai.OperationExecuteTool,
 			ConversationID: sessionIDFromContext(ctx),
 			ErrorType:      et,
 			OccurredAt:     occurredAt,
@@ -60,23 +55,17 @@ func (p *Plugin) beforeTool(ctx context.Context, t toolNameProvider, args map[st
 		p.registry.setToolArguments(key, p.projectToolArguments(args))
 	}
 
-	// Set gen_ai.tool.type = function unconditionally (adapter-owned).
-	span := trace.SpanFromContext(ctx)
-	span.SetAttributes(attribute.String(semconv.AttrGenAIToolType, semconv.ToolTypeFunction))
-
 	// Resolve gen_ai.system through the configured resolver.
+	var system string
 	if p.toolSystemResolver != nil {
-		var system string
-		panicErr := safety.GuardedCall(func() error {
-			system = p.toolSystemResolver(t)
-			return nil
-		})
-		if panicErr != nil {
+		if !guardedCall(func() { system = p.toolSystemResolver(t) }) {
 			p.instr.ReportInstrumentationFailure(otelgenai.InstrumentationFailureToolSystemResolverPanic)
-		} else if system != "" {
-			span.SetAttributes(attribute.String(semconv.AttrGenAISystem, system))
 		}
 	}
+
+	// Apply gen_ai.tool.type (defaults to "function") and gen_ai.system
+	// through the constrained adapter API.
+	p.instr.AugmentToolSpan(ctx, otelgenai.ToolSpanAttributes{System: system})
 }
 
 // afterTool emits tool duration, the tool-details event, increments the
@@ -125,9 +114,8 @@ func (p *Plugin) afterTool(ctx context.Context, result map[string]any, err error
 	}
 	p.instr.EmitToolDetails(ctx, details)
 
-	// Augment the active execute_tool span with error.type and status.
-	span := trace.SpanFromContext(ctx)
-	classifyAndSetError(span, p.instr, err)
+	// Apply the final outcome to the active execute_tool span.
+	p.instr.ApplySpanOutcome(ctx, err)
 }
 
 // onToolError records the observed tool error as an occurrence event
@@ -148,7 +136,7 @@ func (p *Plugin) onToolError(ctx context.Context, err error, occurredAt time.Tim
 	p.instr.EmitAgentOccurrence(ctx, otelgenai.AgentOccurrence{
 		Kind:           otelgenai.OccurrenceToolErrorObserved,
 		AgentName:      agentKey.AgentName,
-		Operation:      otelgenai.Operation("execute_tool"),
+		Operation:      otelgenai.OperationExecuteTool,
 		ConversationID: sessionIDFromContext(ctx),
 		ErrorType:      et,
 		OccurredAt:     occurredAt,

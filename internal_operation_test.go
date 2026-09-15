@@ -159,6 +159,63 @@ func TestStartInternalOperation_NoAgentCounterIncrement(t *testing.T) {
 	}
 }
 
+func TestStartInternalOperation_ConversationID(t *testing.T) {
+	rec := testutil.NewRecorder()
+	defer rec.Shutdown(context.Background())
+
+	instr, err := New(
+		WithTracerProvider(rec.TracerProvider()),
+		WithMeterProvider(rec.MeterProvider()),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx := WithConversationID(context.Background(), "conv-123")
+	_, op := instr.StartInternalOperation(ctx, "resources/read")
+	if op == nil {
+		t.Fatal("expected non-nil operation")
+	}
+	op.End(nil)
+
+	spans := rec.Spans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	s := spans[0]
+	testutil.AssertAttr(t, s, "gen_ai.conversation.id", attribute.StringValue("conv-123"))
+}
+
+func TestStartInternalOperation_ConversationIDDoesNotMutateCallerAttrs(t *testing.T) {
+	rec := testutil.NewRecorder()
+	defer rec.Shutdown(context.Background())
+
+	instr, err := New(
+		WithTracerProvider(rec.TracerProvider()),
+		WithMeterProvider(rec.MeterProvider()),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	callerAttrs := []attribute.KeyValue{
+		attribute.String("mcp.method.name", "resources/read"),
+	}
+	ctx := WithConversationID(context.Background(), "conv-456")
+	_, op := instr.StartInternalOperation(ctx, "resources/read", callerAttrs...)
+	if op == nil {
+		t.Fatal("expected non-nil operation")
+	}
+	op.End(nil)
+
+	if len(callerAttrs) != 1 {
+		t.Fatalf("caller attrs slice was mutated: len=%d", len(callerAttrs))
+	}
+	if callerAttrs[0].Key != "mcp.method.name" {
+		t.Fatalf("caller attrs[0] key changed: %q", callerAttrs[0].Key)
+	}
+}
+
 func TestToolRequest_Attrs(t *testing.T) {
 	rec := testutil.NewRecorder()
 	defer rec.Shutdown(context.Background())
