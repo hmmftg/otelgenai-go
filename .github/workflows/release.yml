@@ -15,7 +15,7 @@ on:
           - mcp
           - adk
       version:
-        description: "Version tag (e.g. v0.1.0)"
+        description: "Version tag (e.g. v0.6.0)"
         required: true
         type: string
 
@@ -25,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_MODULE: ${{ inputs.module }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +36,24 @@ jobs:
         with:
           go-version: "1.27"
 
-      - name: Validate all modules
+      - name: Validate version format
+        run: |
+          if ! echo "$RELEASE_VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: version must match vMAJOR.MINOR.PATCH (e.g. v0.6.0), got: $RELEASE_VERSION"
+            exit 1
+          fi
+
+      - name: Validate root version matches Version constant
+        if: ${{ inputs.module == 'root' }}
+        run: |
+          expected="v$(grep -oP '^const Version = "\K[^"]+' version.go)"
+          if [ "$RELEASE_VERSION" != "$expected" ]; then
+            echo "ERROR: root release version $RELEASE_VERSION does not match Version constant $expected"
+            exit 1
+          fi
+
+      - name: Validate all modules (workspace mode)
+        if: ${{ inputs.module == 'root' }}
         run: |
           go mod tidy
           go vet ./...
@@ -43,9 +63,10 @@ jobs:
           cd ../anthropic && go mod tidy && go vet ./... && go test ./... && go build ./...
           cd ../google-genai && go mod tidy && go vet ./... && go test ./... && go build ./...
           cd ../mcp && go mod tidy && go vet ./... && go test ./... && go build ./...
-          cd ../adk && GOWORK=off go mod tidy && GOWORK=off go vet ./... && GOWORK=off go test ./... && GOWORK=off go build ./...
+          cd ../adk && go mod tidy && go vet ./... && go test ./... && go build ./...
 
       - name: Validate downstream consumers
+        if: ${{ inputs.module == 'root' }}
         run: |
           cd test/downstream/root-only && GOWORK=off go build ./...
           cd ../openai-only && GOWORK=off go build ./...
@@ -54,34 +75,36 @@ jobs:
           cd ../mcp-only && GOWORK=off go build ./...
           cd ../adk-only && GOWORK=off go build ./...
 
+      - name: Validate adapter against published core (no-replace)
+        if: ${{ inputs.module != 'root' }}
+        run: |
+          mod_dir="instrumentation/$RELEASE_MODULE"
+          cd "$mod_dir"
+          # Verify the adapter can resolve its declared core requirement
+          # from the Go proxy (no local replace). This is the required
+          # no-replace consumer check after core publication.
+          GOWORK=off go mod download
+          GOWORK=off go vet ./...
+          GOWORK=off go test ./...
+          GOWORK=off go build ./...
+
       - name: Determine tag
         id: tag
         run: |
-          case "${{ inputs.module }}" in
+          case "$RELEASE_MODULE" in
             root)
-              echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
+              echo "tag=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
               ;;
-            openai)
-              echo "tag=instrumentation/openai/${{ inputs.version }}" >> $GITHUB_OUTPUT
-              ;;
-            anthropic)
-              echo "tag=instrumentation/anthropic/${{ inputs.version }}" >> $GITHUB_OUTPUT
-              ;;
-            google-genai)
-              echo "tag=instrumentation/google-genai/${{ inputs.version }}" >> $GITHUB_OUTPUT
-              ;;
-            mcp)
-              echo "tag=instrumentation/mcp/${{ inputs.version }}" >> $GITHUB_OUTPUT
-              ;;
-            adk)
-              echo "tag=instrumentation/adk/${{ inputs.version }}" >> $GITHUB_OUTPUT
+            openai|anthropic|google-genai|mcp|adk)
+              echo "tag=instrumentation/$RELEASE_MODULE/$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
               ;;
           esac
 
       - name: Create tag
         run: |
-          git tag ${{ steps.tag.outputs.tag }}
-          git push origin ${{ steps.tag.outputs.tag }}
+          tag="${{ steps.tag.outputs.tag }}"
+          git tag "$tag"
+          git push origin "$tag"
 
       - name: Create release
         uses: softprops/action-gh-release@v2

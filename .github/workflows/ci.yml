@@ -8,17 +8,37 @@ on:
 
 jobs:
   test:
-    name: Test
+    name: Test (${{ matrix.os }}, ${{ matrix.module }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        module: [root, openai, anthropic, google-genai, mcp, adk]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.27"
-      - name: Go mod tidy check
+      - name: Go vet
+        working-directory: ${{ matrix.module == 'root' && '.' || format('instrumentation/{0}', matrix.module) }}
+        run: go vet ./...
+      - name: Go build
+        working-directory: ${{ matrix.module == 'root' && '.' || format('instrumentation/{0}', matrix.module) }}
+        run: go build ./...
+      - name: Go test
+        working-directory: ${{ matrix.module == 'root' && '.' || format('instrumentation/{0}', matrix.module) }}
+        run: go test ./...
+
+  tidy:
+    name: Go mod tidy check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - name: Tidy all modules
         run: |
           go mod tidy
           cd instrumentation/openai && go mod tidy
@@ -27,38 +47,39 @@ jobs:
           cd ../mcp && go mod tidy
           cd ../adk && go mod tidy
           cd ../.. && git diff --exit-code
-      - name: Go vet
-        run: go vet ./...
-      - name: Go build
-        run: go build ./...
-      - name: Go test
-        run: go test ./...
+
+  boundary:
+    name: Internal-import boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check no production adapter imports of internal/*
+        run: |
+          set -e
+          # Find non-test .go files in adapter packages that import internal/*
+          matches=$(grep -rn 'github.com/hmmftg/otelgenai-go/internal/' \
+            --include='*.go' --exclude='*_test.go' \
+            instrumentation/ || true)
+          if [ -n "$matches" ]; then
+            echo "ERROR: production adapter files import internal/* packages:"
+            echo "$matches"
+            exit 1
+          fi
 
   test-race:
     name: Race test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [root, openai, anthropic, google-genai, mcp, adk]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.27"
-      - name: Race test (root)
-        run: go test -race -coverprofile=coverage-root.out ./...
-      - name: Race test (openai)
-        run: cd instrumentation/openai && go test -race ./...
-      - name: Race test (anthropic)
-        run: cd instrumentation/anthropic && go test -race ./...
-      - name: Race test (google-genai)
-        run: cd instrumentation/google-genai && go test -race ./...
-      - name: Race test (mcp)
-        run: cd instrumentation/mcp && go test -race ./...
-      - name: Race test (adk)
-        run: cd instrumentation/adk && GOWORK=off go test -race ./...
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage-*.out
+      - name: Race test
+        working-directory: ${{ matrix.module == 'root' && '.' || format('instrumentation/{0}', matrix.module) }}
+        run: go test -race ./...
 
   downstream:
     name: Downstream consumers
